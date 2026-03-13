@@ -81,6 +81,30 @@ const VIDEO_PARSER_APIS = [
             }
             return null;
         }
+    },
+    {
+        name: 'API7',
+        url: 'https://api.xiaoxiaoapi.com/api/video/parse',
+        paramName: 'url',
+        handler: (data) => {
+            console.log('API7 response:', JSON.stringify(data).substring(0, 200));
+            if (data && data.code === 200 && data.data && data.data.video_url) {
+                return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video_url };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API8',
+        url: 'https://api.iyk0.com/shipin/',
+        paramName: 'url',
+        handler: (data) => {
+            console.log('API8 response:', JSON.stringify(data).substring(0, 200));
+            if (data && data.code === 200 && data.data && data.data.video) {
+                return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video };
+            }
+            return null;
+        }
     }
 ];
 
