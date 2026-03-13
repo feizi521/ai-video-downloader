@@ -10,8 +10,8 @@ const SUPPORTED_PLATFORMS = {
     weibo: { name: '微博', domains: ['weibo.com', 'weibo.cn'], contentType: 'mixed' }
 };
 
-// 金鹰资源解析接口
-const PARSER_API = 'https://hd.iapijy.com/play?url=';
+// 金鹰资源 JSON 采集接口
+const PARSER_API = 'https://jyzyapi.com/provide/vod/from/jinyingm3u8/at/json';
 
 export default {
     async fetch(request, env, ctx) {
@@ -48,10 +48,88 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 使用金鹰资源解析接口
-        const downloadUrl = `${PARSER_API}${encodeURIComponent(url)}`;
+        // 使用金鹰资源 JSON 采集接口
+        const apiUrl = `${PARSER_API}?url=${encodeURIComponent(url)}`;
+        console.log('Calling API:', apiUrl);
         
-        console.log('Generated download URL:', downloadUrl);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            },
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log('API response status:', response.status);
+        
+        if (!response.ok) {
+            console.log('API failed, fallback to play page');
+            const fallbackUrl = `https://hd.iapijy.com/play?url=${encodeURIComponent(url)}`;
+            return jsonResponse({
+                success: true,
+                data: {
+                    url: url,
+                    platform: platformInfo.name,
+                    contentType: platformInfo.contentType,
+                    title: `${platformInfo.name}视频`,
+                    thumbnail: '',
+                    downloadUrl: fallbackUrl,
+                    duration: 0,
+                    fileSize: 0,
+                    message: '解析成功'
+                }
+            });
+        }
+        
+        const data = await response.json();
+        console.log('API response:', JSON.stringify(data).substring(0, 300));
+        
+        // 解析 JSON 返回数据
+        let downloadUrl = null;
+        
+        // 尝试从 JSON 中提取视频地址
+        if (data && data.data) {
+            if (data.data.url) {
+                downloadUrl = data.data.url;
+            } else if (data.data.play_url) {
+                downloadUrl = data.data.play_url;
+            } else if (data.data.video) {
+                downloadUrl = data.data.video;
+            } else if (data.data.play_urls && data.data.play_urls.length > 0) {
+                downloadUrl = data.data.play_urls[0];
+            }
+        } else if (data && data.url) {
+            downloadUrl = data.url;
+        }
+        
+        // 如果找到视频地址，返回直接链接
+        if (downloadUrl) {
+            console.log('Found video URL:', downloadUrl);
+            return jsonResponse({
+                success: true,
+                data: {
+                    url: url,
+                    platform: platformInfo.name,
+                    contentType: platformInfo.contentType,
+                    title: data?.data?.title || data?.title || `${platformInfo.name}视频`,
+                    thumbnail: data?.data?.cover || data?.cover || '',
+                    downloadUrl: downloadUrl,
+                    duration: data?.data?.duration || data?.duration || 0,
+                    fileSize: 0,
+                    message: '解析成功'
+                }
+            });
+        }
+        
+        // 如果没有找到，回退到播放页面
+        console.log('No video URL found, fallback to play page');
+        const fallbackUrl = `https://hd.iapijy.com/play?url=${encodeURIComponent(url)}`;
         
         return jsonResponse({
             success: true,
@@ -61,7 +139,7 @@ async function handleParse(request) {
                 contentType: platformInfo.contentType,
                 title: `${platformInfo.name}视频`,
                 thumbnail: '',
-                downloadUrl: downloadUrl,
+                downloadUrl: fallbackUrl,
                 duration: 0,
                 fileSize: 0,
                 message: '解析成功'
