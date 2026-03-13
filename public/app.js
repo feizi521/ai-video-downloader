@@ -1,102 +1,7 @@
-// API 配置 - 纯前端方案，直接调用第三方解析API
-const VIDEO_PARSER_APIS = [
-    {
-        name: 'API1',
-        url: 'https://api.pearktrue.cn/api/video/parse/',
-        method: 'GET',
-        paramName: 'url',
-        responseHandler: (data) => {
-            if (data && data.video) {
-                return {
-                    title: data.title,
-                    cover: data.cover,
-                    downloadUrl: data.video
-                };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'API2',
-        url: 'https://api.linhun.vip/api/VideoParse',
-        method: 'GET',
-        paramName: 'url',
-        responseHandler: (data) => {
-            if (data && data.data && data.data.video) {
-                return {
-                    title: data.data.title,
-                    cover: data.data.cover,
-                    downloadUrl: data.data.video
-                };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'API3',
-        url: 'https://api.vvhan.com/api/video',
-        method: 'GET',
-        paramName: 'url',
-        responseHandler: (data) => {
-            if (data && data.data && data.data.url) {
-                return {
-                    title: data.data.title,
-                    cover: data.data.pic,
-                    downloadUrl: data.data.url
-                };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'API4',
-        url: 'https://api.asdj.cn/api/video/parse',
-        method: 'GET',
-        paramName: 'url',
-        responseHandler: (data) => {
-            if (data && data.video) {
-                return {
-                    title: data.title,
-                    cover: data.cover,
-                    downloadUrl: data.video
-                };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'API5',
-        url: 'https://api.mhimg.cn/api/video/parse',
-        method: 'GET',
-        paramName: 'url',
-        responseHandler: (data) => {
-            if (data && data.code === 200 && data.data && data.data.video_url) {
-                return {
-                    title: data.data.title,
-                    cover: data.data.cover,
-                    downloadUrl: data.data.video_url
-                };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'API6',
-        url: 'https://api.52vmy.cn/api/video/parse',
-        method: 'GET',
-        paramName: 'url',
-        responseHandler: (data) => {
-            if (data && data.code === 200 && data.data && data.data.video) {
-                return {
-                    title: data.data.title,
-                    cover: data.data.cover,
-                    downloadUrl: data.data.video
-                };
-            }
-            return null;
-        }
-    }
-];
+// API 配置 - 使用 Cloudflare Worker 后端
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8788/api'
+    : 'https://jxhoutai.farholme.com/api';
 
 // 支持的平台
 const SUPPORTED_PLATFORMS = {
@@ -245,8 +150,20 @@ class VideoDownloader {
         this.hideResults();
 
         try {
-            // 纯前端方案：直接调用解析API
-            const parseResult = await this.parseWithAPIs(url, platformInfo);
+            // 调用 Cloudflare Worker 后端 API
+            const response = await fetch(`${API_BASE}/parse`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ url }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const parseResult = await response.json();
             
             if (parseResult.success) {
                 this.showResult(parseResult.data);
@@ -256,7 +173,7 @@ class VideoDownloader {
             }
         } catch (error) {
             console.error('Parse error:', error);
-            this.showError('网络错误，请检查连接后重试');
+            this.showError('网络错误，请检查连接后重试: ' + error.message);
         } finally {
             this.setLoading(false);
         }
@@ -374,76 +291,6 @@ class VideoDownloader {
         } catch {
             return null;
         }
-    }
-
-    // 纯前端解析：尝试多个API
-    async parseWithAPIs(url, platformInfo) {
-        let lastError = null;
-        
-        for (const api of VIDEO_PARSER_APIS) {
-            try {
-                console.log(`尝试使用 ${api.name} 解析...`);
-                
-                const apiUrl = new URL(api.url);
-                apiUrl.searchParams.append(api.paramName, url);
-                
-                // 添加超时控制
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
-                
-                const response = await fetch(apiUrl.toString(), {
-                    method: api.method,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        'Accept': 'application/json'
-                    },
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // 使用API的响应处理器
-                    const result = api.responseHandler ? api.responseHandler(data) : null;
-                    
-                    if (result && result.downloadUrl) {
-                        console.log(`${api.name} 解析成功`);
-                        return {
-                            success: true,
-                            data: {
-                                url: url,
-                                platform: platformInfo.name,
-                                contentType: platformInfo.contentType,
-                                title: result.title || `${platformInfo.name}视频`,
-                                thumbnail: result.cover || '',
-                                downloadUrl: result.downloadUrl,
-                                duration: 0,
-                                fileSize: 0,
-                                message: '解析成功，点击下载按钮即可下载视频'
-                            }
-                        };
-                    }
-                }
-            } catch (error) {
-                console.error(`${api.name} 解析失败:`, error.message || error);
-                lastError = error;
-            }
-        }
-        
-        // 如果所有API都失败，返回更详细的错误信息
-        let errorMessage = '所有解析API都失败了';
-        if (lastError && lastError.name === 'TypeError' && lastError.message.includes('fetch')) {
-            errorMessage = '网络请求失败，可能是CORS跨域限制或网络问题';
-        } else if (lastError && lastError.name === 'AbortError') {
-            errorMessage = '请求超时，请检查网络连接';
-        }
-        
-        return { 
-            success: false, 
-            message: errorMessage + '，请稍后重试或使用其他工具' 
-        };
     }
 
     showError(message) {
