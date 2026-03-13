@@ -9,38 +9,6 @@ const SUPPORTED_PLATFORMS = {
     weibo: { name: '微博', domains: ['weibo.com', 'weibo.cn'], contentType: 'mixed' }
 };
 
-// 使用多个稳定的解析服务
-const VIDEO_PARSER_APIS = [
-    {
-        name: 'Jiexi1',
-        url: 'https://jx.jsonplayer.com/player/',
-        paramName: 'url',
-        type: 'redirect',
-        handler: (data, responseUrl) => {
-            // 这个API返回重定向到视频地址
-            return { title: '视频', cover: '', downloadUrl: responseUrl };
-        }
-    },
-    {
-        name: 'Jiexi2',
-        url: 'https://jx.aidouer.net/api/',
-        paramName: 'url',
-        type: 'redirect',
-        handler: (data, responseUrl) => {
-            return { title: '视频', cover: '', downloadUrl: responseUrl };
-        }
-    },
-    {
-        name: 'Jiexi3',
-        url: 'https://jx.m3u8.tv/jiexi.php',
-        paramName: 'url',
-        type: 'redirect',
-        handler: (data, responseUrl) => {
-            return { title: '视频', cover: '', downloadUrl: responseUrl };
-        }
-    }
-];
-
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
@@ -77,101 +45,27 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 对于Bilibili，尝试直接解析
-        if (platformInfo.key === 'bilibili') {
-            const biliResult = await parseBilibili(url);
-            if (biliResult) {
-                return jsonResponse({
-                    success: true,
-                    data: {
-                        url: url,
-                        platform: platformInfo.name,
-                        contentType: platformInfo.contentType,
-                        title: biliResult.title || `${platformInfo.name}视频`,
-                        thumbnail: biliResult.cover || '',
-                        downloadUrl: biliResult.downloadUrl,
-                        duration: biliResult.duration || 0,
-                        fileSize: 0,
-                        message: '解析成功'
-                    }
-                });
-            }
-        }
-
-        // 尝试使用解析服务
-        for (const api of VIDEO_PARSER_APIS) {
-            try {
-                console.log(`Trying ${api.name}...`);
-                
-                const apiUrl = `${api.url}?${api.paramName}=${encodeURIComponent(url)}`;
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000);
-                
-                const response = await fetch(apiUrl, {
-                    method: 'GET',
-                    redirect: 'follow',
-                    headers: { 
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': '*/*',
-                        'Referer': 'https://www.bilibili.com/'
-                    },
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                
-                console.log(`${api.name} response status:`, response.status);
-                console.log(`${api.name} final URL:`, response.url);
-                
-                // 如果返回的是视频URL（不是HTML页面）
-                const contentType = response.headers.get('content-type') || '';
-                console.log(`${api.name} content-type:`, contentType);
-                
-                if (contentType.includes('video') || contentType.includes('application/octet-stream') || contentType.includes('mp4')) {
-                    console.log(`${api.name} success - direct video!`);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: `${platformInfo.name}视频`,
-                            thumbnail: '',
-                            downloadUrl: response.url,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
+        // 使用 yt-dlp 在线服务解析
+        const result = await parseWithYtDlp(url);
+        
+        if (result && result.downloadUrl) {
+            return jsonResponse({
+                success: true,
+                data: {
+                    url: url,
+                    platform: platformInfo.name,
+                    contentType: platformInfo.contentType,
+                    title: result.title || `${platformInfo.name}视频`,
+                    thumbnail: result.thumbnail || '',
+                    downloadUrl: result.downloadUrl,
+                    duration: result.duration || 0,
+                    fileSize: 0,
+                    message: '解析成功'
                 }
-                
-                // 如果是重定向到视频地址
-                if (response.url !== apiUrl && (response.url.includes('.mp4') || response.url.includes('.m3u8') || response.url.includes('video'))) {
-                    console.log(`${api.name} success - redirect to video!`);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: `${platformInfo.name}视频`,
-                            thumbnail: '',
-                            downloadUrl: response.url,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
-                }
-                
-            } catch (e) {
-                console.log(`${api.name} error:`, e.message);
-            }
+            });
         }
         
-        // 如果所有API都失败，返回一个通用的解析方案
-        console.log('All APIs failed, returning generic solution');
+        // 如果 yt-dlp 失败，返回备用方案
         return jsonResponse({
             success: true,
             data: {
@@ -180,10 +74,10 @@ async function handleParse(request) {
                 contentType: platformInfo.contentType,
                 title: `${platformInfo.name}视频`,
                 thumbnail: '',
-                downloadUrl: `https://jx.jsonplayer.com/player/?url=${encodeURIComponent(url)}`,
+                downloadUrl: `https://ytdown.vercel.app/api/download?url=${encodeURIComponent(url)}`,
                 duration: 0,
                 fileSize: 0,
-                message: '已生成解析链接，点击下载即可观看'
+                message: '已生成下载链接'
             }
         });
     } catch (error) {
@@ -192,42 +86,65 @@ async function handleParse(request) {
     }
 }
 
-async function parseBilibili(url) {
+async function parseWithYtDlp(url) {
     try {
-        // 提取BV号
-        const bvMatch = url.match(/BV[a-zA-Z0-9]+/);
-        if (!bvMatch) return null;
+        // 使用 ytdown API
+        const apiUrl = `https://ytdown.vercel.app/api/info?url=${encodeURIComponent(url)}`;
         
-        const bvid = bvMatch[0];
-        console.log('Bilibili BV号:', bvid);
+        console.log('Calling yt-dlp API:', apiUrl);
         
-        // 获取视频信息
-        const infoUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         
-        const response = await fetch(infoUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.bilibili.com/'
-            }
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            },
+            signal: controller.signal
         });
         
-        if (!response.ok) return null;
+        clearTimeout(timeoutId);
+        
+        console.log('yt-dlp response status:', response.status);
+        
+        if (!response.ok) {
+            console.log('yt-dlp API failed:', response.status);
+            return null;
+        }
         
         const data = await response.json();
+        console.log('yt-dlp response:', JSON.stringify(data).substring(0, 300));
         
-        if (data.code === 0 && data.data) {
-            const videoData = data.data;
+        // 检查返回的数据格式
+        if (data && data.formats && data.formats.length > 0) {
+            // 获取最佳质量的视频
+            const bestFormat = data.formats.find(f => f.vcodec !== 'none' && f.acodec !== 'none') || 
+                              data.formats.find(f => f.vcodec !== 'none') ||
+                              data.formats[0];
+            
             return {
-                title: videoData.title,
-                cover: videoData.pic,
-                downloadUrl: url, // 返回原始URL，使用第三方解析服务
-                duration: videoData.duration
+                title: data.title,
+                thumbnail: data.thumbnail,
+                downloadUrl: bestFormat.url,
+                duration: data.duration
+            };
+        }
+        
+        // 如果直接有 url 字段
+        if (data && data.url) {
+            return {
+                title: data.title,
+                thumbnail: data.thumbnail,
+                downloadUrl: data.url,
+                duration: data.duration
             };
         }
         
         return null;
     } catch (e) {
-        console.log('Bilibili parse error:', e.message);
+        console.log('yt-dlp error:', e.message);
         return null;
     }
 }
