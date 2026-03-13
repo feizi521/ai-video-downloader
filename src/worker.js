@@ -1,5 +1,5 @@
 // Cloudflare Worker - 视频解析服务
-// 使用多个解析 API
+// 使用 Cobalt 和 ytdown API
 
 const SUPPORTED_PLATFORMS = {
     douyin: { name: '抖音', domains: ['douyin.com', 'iesdouyin.com'], contentType: 'video' },
@@ -13,7 +13,7 @@ const SUPPORTED_PLATFORMS = {
     facebook: { name: 'Facebook', domains: ['facebook.com', 'fb.watch'], contentType: 'video' }
 };
 
-// 多个解析 API 配置
+// 解析 API 配置
 const PARSER_APIS = [
     {
         name: 'cobalt',
@@ -61,19 +61,6 @@ const PARSER_APIS = [
                 };
             }
             return null;
-        }
-    },
-    {
-        name: 'jy-play',
-        url: 'https://hd.iapijy.com/play',
-        method: 'GET',
-        paramName: 'url',
-        parseResponse: async (response, url) => {
-            return {
-                url: `https://hd.iapijy.com/play?url=${encodeURIComponent(url)}`,
-                title: '',
-                thumbnail: ''
-            };
         }
     }
 ];
@@ -161,7 +148,7 @@ async function handleParse(request) {
             }
         }
 
-        return jsonResponse({ success: false, message: '所有解析接口都失败了' }, 500);
+        return jsonResponse({ success: false, message: '所有解析接口都失败了，请稍后再试' }, 500);
     } catch (error) {
         console.error('Parse error:', error.message);
         return jsonResponse({ success: false, message: error.message }, 500);
