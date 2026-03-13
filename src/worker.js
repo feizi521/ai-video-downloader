@@ -1,5 +1,5 @@
 // Cloudflare Worker - 视频解析服务
-// 使用外部 yt-dlp API
+// 使用金鹰资源解析接口
 
 const SUPPORTED_PLATFORMS = {
     douyin: { name: '抖音', domains: ['douyin.com', 'iesdouyin.com'], contentType: 'video' },
@@ -10,21 +10,8 @@ const SUPPORTED_PLATFORMS = {
     weibo: { name: '微博', domains: ['weibo.com', 'weibo.cn'], contentType: 'mixed' }
 };
 
-// yt-dlp API 服务列表
-const YTDLP_APIS = [
-    {
-        name: 'yt-dlp-api-1',
-        url: 'https://api.yt-dlp.org/info',
-        method: 'GET',
-        paramName: 'url'
-    },
-    {
-        name: 'yt-dlp-api-2',
-        url: 'https://ytdl-api.herokuapp.com/info',
-        method: 'GET',
-        paramName: 'url'
-    }
-];
+// 金鹰资源解析接口
+const PARSER_API = 'https://hd.iapijy.com/play?url=';
 
 export default {
     async fetch(request, env, ctx) {
@@ -61,27 +48,11 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 尝试使用 yt-dlp API 解析
-        const result = await parseWithYtDlpApis(url);
+        // 使用金鹰资源解析接口
+        const downloadUrl = `${PARSER_API}${encodeURIComponent(url)}`;
         
-        if (result && result.downloadUrl) {
-            return jsonResponse({
-                success: true,
-                data: {
-                    url: url,
-                    platform: platformInfo.name,
-                    contentType: platformInfo.contentType,
-                    title: result.title || `${platformInfo.name}视频`,
-                    thumbnail: result.thumbnail || '',
-                    downloadUrl: result.downloadUrl,
-                    duration: result.duration || 0,
-                    fileSize: result.fileSize || 0,
-                    message: '解析成功'
-                }
-            });
-        }
+        console.log('Generated download URL:', downloadUrl);
         
-        // 如果 yt-dlp API 失败，返回备用方案
         return jsonResponse({
             success: true,
             data: {
@@ -90,103 +61,15 @@ async function handleParse(request) {
                 contentType: platformInfo.contentType,
                 title: `${platformInfo.name}视频`,
                 thumbnail: '',
-                downloadUrl: url,
+                downloadUrl: downloadUrl,
                 duration: 0,
                 fileSize: 0,
-                message: '解析服务暂时不可用，请直接访问原链接'
+                message: '解析成功'
             }
         });
     } catch (error) {
         console.error('Parse error:', error.message);
         return jsonResponse({ success: false, message: error.message }, 500);
-    }
-}
-
-async function parseWithYtDlpApis(url) {
-    for (const api of YTDLP_APIS) {
-        try {
-            console.log(`Trying ${api.name}...`);
-            
-            const apiUrl = `${api.url}?${api.paramName}=${encodeURIComponent(url)}`;
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-            
-            const response = await fetch(apiUrl, {
-                method: api.method,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'application/json'
-                },
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            console.log(`${api.name} response status:`, response.status);
-            
-            if (!response.ok) {
-                console.log(`${api.name} failed:`, response.status);
-                continue;
-            }
-            
-            const data = await response.json();
-            console.log(`${api.name} response:`, JSON.stringify(data).substring(0, 200));
-            
-            // 解析返回的数据
-            const result = parseApiResponse(data, api.name);
-            if (result) {
-                console.log(`${api.name} success!`);
-                return result;
-            }
-        } catch (e) {
-            console.log(`${api.name} error:`, e.message);
-        }
-    }
-    
-    return null;
-}
-
-function parseApiResponse(data, apiName) {
-    try {
-        // 根据不同 API 的返回格式解析
-        if (!data) return null;
-        
-        // 格式 1: { title, thumbnail, url, duration, formats: [...] }
-        if (data.url || (data.formats && data.formats.length > 0)) {
-            let downloadUrl = data.url;
-            let fileSize = 0;
-            
-            if (!downloadUrl && data.formats && data.formats.length > 0) {
-                // 选择最佳格式
-                const bestFormat = data.formats.find(f => 
-                    f.vcodec !== 'none' && f.acodec !== 'none'
-                ) || data.formats[0];
-                
-                downloadUrl = bestFormat.url;
-                fileSize = bestFormat.filesize || bestFormat.filesize_approx || 0;
-            }
-            
-            if (downloadUrl) {
-                return {
-                    title: data.title || '视频',
-                    thumbnail: data.thumbnail || '',
-                    downloadUrl: downloadUrl,
-                    duration: data.duration || 0,
-                    fileSize: fileSize
-                };
-            }
-        }
-        
-        // 格式 2: { success: true, data: { ... } }
-        if (data.success && data.data) {
-            return parseApiResponse(data.data, apiName);
-        }
-        
-        return null;
-    } catch (e) {
-        console.log('Parse API response error:', e.message);
-        return null;
     }
 }
 

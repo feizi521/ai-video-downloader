@@ -192,29 +192,17 @@ class VideoDownloader {
         this.isDownloading = true;
         const downloadBtn = document.getElementById('downloadBtn');
         const originalText = downloadBtn.innerHTML;
-        downloadBtn.innerHTML = '<span>⏳ 准备下载...</span>';
+        downloadBtn.innerHTML = '<span>⏳ 正在打开...</span>';
         downloadBtn.disabled = true;
 
         try {
-            this.showMessage('正在准备下载...', 'info');
-            
-            // 方法: 使用 iframe 静默下载，避免跳转
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = this.currentDownloadUrl;
-            document.body.appendChild(iframe);
-            
-            // 3秒后移除 iframe
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 3000);
-            
-            this.showMessage('下载已开始！如果未自动下载，请使用"复制链接"功能', 'success');
+            // 直接在新窗口打开下载链接
+            window.open(this.currentDownloadUrl, '_blank');
+            this.showMessage('已在新窗口打开下载页面', 'success');
 
         } catch (error) {
             console.error('Download error:', error);
-            // 如果 iframe 下载失败，使用备用方法
-            this.fallbackDownload();
+            this.showMessage('打开失败，请使用"复制链接"功能', 'error');
         } finally {
             this.isDownloading = false;
             downloadBtn.innerHTML = originalText;
