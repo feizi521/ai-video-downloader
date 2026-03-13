@@ -16,29 +16,6 @@ const SUPPORTED_PLATFORMS = {
 // 多个解析 API 配置
 const PARSER_APIS = [
     {
-        name: 'snapany',
-        url: 'https://snapany.com/api/v1/download',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
-        },
-        body: (url) => JSON.stringify({ url: url }),
-        parseResponse: async (response) => {
-            const data = await response.json();
-            // SnapAny 返回格式
-            if (data.success && data.data && data.data.medias && data.data.medias.length > 0) {
-                return {
-                    url: data.data.medias[0].url,
-                    title: data.data.title || '',
-                    thumbnail: data.data.cover || ''
-                };
-            }
-            return null;
-        }
-    },
-    {
         name: 'cobalt',
         url: 'https://co.wuk.sh/api/json',
         method: 'POST',
@@ -57,6 +34,7 @@ const PARSER_APIS = [
         }),
         parseResponse: async (response) => {
             const data = await response.json();
+            console.log('Cobalt response:', data);
             if (data.status === 'success' && data.url) {
                 return {
                     url: data.url,
@@ -74,6 +52,7 @@ const PARSER_APIS = [
         paramName: 'url',
         parseResponse: async (response) => {
             const data = await response.json();
+            console.log('Ytdown response:', data);
             if (data.url) {
                 return {
                     url: data.url,
@@ -90,7 +69,6 @@ const PARSER_APIS = [
         method: 'GET',
         paramName: 'url',
         parseResponse: async (response, url) => {
-            // 金鹰资源返回播放页面，直接构造 URL
             return {
                 url: `https://hd.iapijy.com/play?url=${encodeURIComponent(url)}`,
                 title: '',
@@ -135,13 +113,11 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 尝试所有 API
         for (const api of PARSER_APIS) {
             try {
                 console.log(`Trying API: ${api.name}`);
                 
                 let response;
-                let apiUrl;
                 
                 if (api.method === 'POST') {
                     response = await fetch(api.url, {
@@ -150,7 +126,7 @@ async function handleParse(request) {
                         body: api.body(url)
                     });
                 } else {
-                    apiUrl = `${api.url}?${api.paramName}=${encodeURIComponent(url)}`;
+                    const apiUrl = `${api.url}?${api.paramName}=${encodeURIComponent(url)}`;
                     response = await fetch(apiUrl, {
                         method: 'GET',
                         headers: api.headers || {}
