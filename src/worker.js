@@ -13,58 +13,6 @@ const SUPPORTED_PLATFORMS = {
     facebook: { name: 'Facebook', domains: ['facebook.com', 'fb.watch'], contentType: 'video' }
 };
 
-// 解析 API 配置
-const PARSER_APIS = [
-    {
-        name: 'cobalt',
-        url: 'https://co.wuk.sh/api/json',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
-        },
-        body: (url) => JSON.stringify({ 
-            url: url, 
-            vCodec: 'h264', 
-            vQuality: '720', 
-            aFormat: 'best', 
-            isAudioOnly: false, 
-            isNoTTWatermark: true 
-        }),
-        parseResponse: async (response) => {
-            const data = await response.json();
-            console.log('Cobalt response:', data);
-            if (data.status === 'success' && data.url) {
-                return {
-                    url: data.url,
-                    title: '',
-                    thumbnail: ''
-                };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'ytdown',
-        url: 'https://ytdown.vercel.app/api/download',
-        method: 'GET',
-        paramName: 'url',
-        parseResponse: async (response) => {
-            const data = await response.json();
-            console.log('Ytdown response:', data);
-            if (data.url) {
-                return {
-                    url: data.url,
-                    title: data.title || '',
-                    thumbnail: data.thumbnail || ''
-                };
-            }
-            return null;
-        }
-    }
-];
-
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
@@ -100,58 +48,97 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        for (const api of PARSER_APIS) {
-            try {
-                console.log(`Trying API: ${api.name}`);
+        // 尝试 Cobalt API
+        try {
+            console.log('Trying Cobalt API...');
+            const cobaltResponse = await fetch('https://co.wuk.sh/api/json', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    url: url, 
+                    vCodec: 'h264', 
+                    vQuality: '720', 
+                    aFormat: 'best', 
+                    isAudioOnly: false, 
+                    isNoTTWatermark: true 
+                })
+            });
+
+            console.log('Cobalt response status:', cobaltResponse.status);
+
+            if (cobaltResponse.ok) {
+                const data = await cobaltResponse.json();
+                console.log('Cobalt response:', JSON.stringify(data));
                 
-                let response;
-                
-                if (api.method === 'POST') {
-                    response = await fetch(api.url, {
-                        method: 'POST',
-                        headers: api.headers,
-                        body: api.body(url)
-                    });
-                } else {
-                    const apiUrl = `${api.url}?${api.paramName}=${encodeURIComponent(url)}`;
-                    response = await fetch(apiUrl, {
-                        method: 'GET',
-                        headers: api.headers || {}
+                if (data.status === 'success' && data.url) {
+                    console.log('Found video URL from Cobalt:', data.url);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: `${platformInfo.name}视频`,
+                            thumbnail: '',
+                            downloadUrl: data.url,
+                            duration: 0,
+                            fileSize: 0,
+                            message: '解析成功'
+                        }
                     });
                 }
-
-                console.log(`${api.name} response status:`, response.status);
-
-                if (response.ok) {
-                    const result = await api.parseResponse(response, url);
-                    
-                    if (result && result.url) {
-                        console.log(`Found video URL from ${api.name}:`, result.url);
-                        return jsonResponse({
-                            success: true,
-                            data: {
-                                url: url,
-                                platform: platformInfo.name,
-                                contentType: platformInfo.contentType,
-                                title: result.title || `${platformInfo.name}视频`,
-                                thumbnail: result.thumbnail || '',
-                                downloadUrl: result.url,
-                                duration: 0,
-                                fileSize: 0,
-                                message: '解析成功'
-                            }
-                        });
-                    }
-                }
-            } catch (apiError) {
-                console.error(`${api.name} error:`, apiError.message);
             }
+        } catch (cobaltError) {
+            console.error('Cobalt error:', cobaltError.message);
+        }
+
+        // 尝试 ytdown API
+        try {
+            console.log('Trying ytdown API...');
+            const ytdownUrl = `https://ytdown.vercel.app/api/download?url=${encodeURIComponent(url)}`;
+            const ytdownResponse = await fetch(ytdownUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            console.log('ytdown response status:', ytdownResponse.status);
+
+            if (ytdownResponse.ok) {
+                const data = await ytdownResponse.json();
+                console.log('ytdown response:', JSON.stringify(data));
+                
+                if (data.url) {
+                    console.log('Found video URL from ytdown:', data.url);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: data.title || `${platformInfo.name}视频`,
+                            thumbnail: data.thumbnail || '',
+                            downloadUrl: data.url,
+                            duration: 0,
+                            fileSize: 0,
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (ytdownError) {
+            console.error('ytdown error:', ytdownError.message);
         }
 
         return jsonResponse({ success: false, message: '所有解析接口都失败了，请稍后再试' }, 500);
     } catch (error) {
         console.error('Parse error:', error.message);
-        return jsonResponse({ success: false, message: error.message }, 500);
+        return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500);
     }
 }
 
