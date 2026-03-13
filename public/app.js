@@ -4,13 +4,65 @@ const VIDEO_PARSER_APIS = [
         name: 'API1',
         url: 'https://api.pearktrue.cn/api/video/parse/',
         method: 'GET',
-        paramName: 'url'
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.video) {
+                return {
+                    title: data.title,
+                    cover: data.cover,
+                    downloadUrl: data.video
+                };
+            }
+            return null;
+        }
     },
     {
         name: 'API2',
         url: 'https://api.linhun.vip/api/VideoParse',
         method: 'GET',
-        paramName: 'url'
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.data && data.data.video) {
+                return {
+                    title: data.data.title,
+                    cover: data.data.cover,
+                    downloadUrl: data.data.video
+                };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API3',
+        url: 'https://api.vvhan.com/api/video',
+        method: 'GET',
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.data && data.data.url) {
+                return {
+                    title: data.data.title,
+                    cover: data.data.pic,
+                    downloadUrl: data.data.url
+                };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API4',
+        url: 'https://api.asdj.cn/api/video/parse',
+        method: 'GET',
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.video) {
+                return {
+                    title: data.title,
+                    cover: data.cover,
+                    downloadUrl: data.video
+                };
+            }
+            return null;
+        }
     }
 ];
 
@@ -311,24 +363,10 @@ class VideoDownloader {
                 if (response.ok) {
                     const data = await response.json();
                     
-                    // 处理不同API的返回格式
-                    let videoUrl = null;
-                    let title = null;
-                    let cover = null;
+                    // 使用API的响应处理器
+                    const result = api.responseHandler ? api.responseHandler(data) : null;
                     
-                    if (data.video) {
-                        // API1 格式
-                        videoUrl = data.video;
-                        title = data.title;
-                        cover = data.cover;
-                    } else if (data.data && data.data.video) {
-                        // API2 格式
-                        videoUrl = data.data.video;
-                        title = data.data.title;
-                        cover = data.data.cover;
-                    }
-                    
-                    if (videoUrl) {
+                    if (result && result.downloadUrl) {
                         console.log(`${api.name} 解析成功`);
                         return {
                             success: true,
@@ -336,9 +374,9 @@ class VideoDownloader {
                                 url: url,
                                 platform: platformInfo.name,
                                 contentType: platformInfo.contentType,
-                                title: title || `${platformInfo.name}视频`,
-                                thumbnail: cover || '',
-                                downloadUrl: videoUrl,
+                                title: result.title || `${platformInfo.name}视频`,
+                                thumbnail: result.cover || '',
+                                downloadUrl: result.downloadUrl,
                                 duration: 0,
                                 fileSize: 0,
                                 message: '解析成功，点击下载按钮即可下载视频'
