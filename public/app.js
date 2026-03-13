@@ -192,37 +192,17 @@ class VideoDownloader {
         this.isDownloading = true;
         const downloadBtn = document.getElementById('downloadBtn');
         const originalText = downloadBtn.innerHTML;
-        downloadBtn.innerHTML = '<span>⏳ 准备下载...</span>';
+        downloadBtn.innerHTML = '<span>⏳ 正在打开...</span>';
         downloadBtn.disabled = true;
 
         try {
-            // 检查是否是播放页面链接
-            const isPlayPage = this.currentDownloadUrl.includes('hd.iapijy.com/play') || 
-                              this.currentDownloadUrl.includes('lapijy.com/play');
-            
-            if (isPlayPage) {
-                // 如果是播放页面，在新窗口打开
-                window.open(this.currentDownloadUrl, '_blank');
-                this.showMessage('已在新窗口打开播放页面', 'success');
-            } else {
-                // 如果是直接视频链接，尝试静默下载
-                this.showMessage('正在准备下载...', 'info');
-                
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = this.currentDownloadUrl;
-                document.body.appendChild(iframe);
-                
-                setTimeout(() => {
-                    document.body.removeChild(iframe);
-                }, 3000);
-                
-                this.showMessage('下载已开始！如果未自动下载，请使用"复制链接"功能', 'success');
-            }
+            // 直接在新窗口打开下载链接
+            window.open(this.currentDownloadUrl, '_blank');
+            this.showMessage('已在新窗口打开', 'success');
 
         } catch (error) {
             console.error('Download error:', error);
-            this.fallbackDownload();
+            this.showMessage('打开失败，请使用"复制链接"功能', 'error');
         } finally {
             this.isDownloading = false;
             downloadBtn.innerHTML = originalText;
