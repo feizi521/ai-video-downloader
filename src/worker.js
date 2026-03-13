@@ -1,5 +1,5 @@
 // Cloudflare Worker - 视频解析服务
-// 使用多个可靠的解析 API
+// 简化版本 - 返回第三方解析网站链接
 
 const SUPPORTED_PLATFORMS = {
     douyin: { name: '抖音', domains: ['douyin.com', 'iesdouyin.com'], contentType: 'video' },
@@ -12,6 +12,14 @@ const SUPPORTED_PLATFORMS = {
     instagram: { name: 'Instagram', domains: ['instagram.com'], contentType: 'video' },
     facebook: { name: 'Facebook', domains: ['facebook.com', 'fb.watch'], contentType: 'video' }
 };
+
+// 第三方解析网站列表
+const PARSER_SITES = [
+    { name: 'SnapAny', url: 'https://snapany.com' },
+    { name: 'SaveFrom', url: 'https://savefrom.net' },
+    { name: 'Y2mate', url: 'https://y2mate.com' },
+    { name: 'SSYouTube', url: 'https://ssyoutube.com' }
+];
 
 export default {
     async fetch(request, env, ctx) {
@@ -53,132 +61,37 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 尝试 SnapAny API
-        try {
-            console.log('Trying SnapAny API...');
-            const snapanyUrl = `https://snapany.com/api/v1/download`;
-            const response = await fetch(snapanyUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'application/json',
-                    'Origin': 'https://snapany.com',
-                    'Referer': 'https://snapany.com/'
-                },
-                body: JSON.stringify({ url: url })
-            });
-
-            console.log('SnapAny response status:', response.status);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('SnapAny response:', JSON.stringify(data).substring(0, 1000));
-                
-                if (data.success && data.data && data.data.medias && data.data.medias.length > 0) {
-                    const media = data.data.medias[0];
-                    console.log('Found video URL from SnapAny:', media.url);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: data.data.title || `${platformInfo.name}视频`,
-                            thumbnail: data.data.cover || '',
-                            downloadUrl: media.url,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
-                }
+        // 方案1: 尝试 yt-dlp 风格的 API (如果用户有自己的服务)
+        // 这里可以配置用户自己的解析服务
+        
+        // 方案2: 返回第三方解析网站的嵌入链接
+        // 生成 SnapAny 的解析链接
+        const snapanyParseUrl = `https://snapany.com/#${encodeURIComponent(url)}`;
+        
+        // 或者使用 iframe 嵌入方案
+        // 返回解析结果，前端可以用 iframe 打开
+        
+        return jsonResponse({
+            success: true,
+            data: {
+                url: url,
+                platform: platformInfo.name,
+                contentType: platformInfo.contentType,
+                title: `${platformInfo.name}视频`,
+                thumbnail: '',
+                downloadUrl: snapanyParseUrl,  // 返回第三方解析页面
+                embedUrl: snapanyParseUrl,      // 可以嵌入的 URL
+                parserSites: PARSER_SITES.map(site => ({
+                    name: site.name,
+                    url: `${site.url}/#${encodeURIComponent(url)}`
+                })),
+                duration: 0,
+                fileSize: 0,
+                message: '请使用下方链接下载',
+                type: 'third_party'  // 标记为第三方解析
             }
-        } catch (error) {
-            console.error('SnapAny error:', error.message);
-        }
-
-        // 尝试 savefrom API
-        try {
-            console.log('Trying savefrom API...');
-            const savefromUrl = `https://savefrom.do/api/v1/info?url=${encodeURIComponent(url)}`;
-            const response = await fetch(savefromUrl, {
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            console.log('savefrom response status:', response.status);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('savefrom response:', JSON.stringify(data).substring(0, 500));
-                
-                if (data.url || (data.data && data.data.url)) {
-                    const videoUrl = data.url || data.data.url;
-                    console.log('Found video URL from savefrom:', videoUrl);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: data.title || data.data?.title || `${platformInfo.name}视频`,
-                            thumbnail: data.thumbnail || data.data?.thumbnail || '',
-                            downloadUrl: videoUrl,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('savefrom error:', error.message);
-        }
-
-        // 尝试 ssyoutube API
-        try {
-            console.log('Trying ssyoutube API...');
-            const ssyoutubeUrl = `https://ssyoutube.com/api/convert?url=${encodeURIComponent(url)}`;
-            const response = await fetch(ssyoutubeUrl, {
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            console.log('ssyoutube response status:', response.status);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('ssyoutube response:', JSON.stringify(data).substring(0, 500));
-                
-                if (data.url || (data.data && data.data.url)) {
-                    const videoUrl = data.url || data.data.url;
-                    console.log('Found video URL from ssyoutube:', videoUrl);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: data.title || data.data?.title || `${platformInfo.name}视频`,
-                            thumbnail: data.thumbnail || data.data?.thumbnail || '',
-                            downloadUrl: videoUrl,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('ssyoutube error:', error.message);
-        }
-
-        return jsonResponse({ success: false, message: '所有解析接口都失败了，请稍后再试' }, 500);
+        });
+        
     } catch (error) {
         console.error('Parse error:', error.message);
         return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500);
