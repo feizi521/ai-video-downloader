@@ -106,8 +106,8 @@ async function handleParse(request) {
 
 async function parseWithCobalt(url) {
     try {
-        // 使用 cobalt API
-        const apiUrl = 'https://api.cobalt.tools/api/json';
+        // 使用 cobalt API (正确的端点)
+        const apiUrl = 'https://co.wuk.sh/api/json';
         
         console.log('Calling cobalt API for:', url);
         
