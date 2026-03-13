@@ -17,6 +17,11 @@ export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
         
+        // 添加健康检查端点
+        if (url.pathname === '/health') {
+            return jsonResponse({ status: 'ok', message: 'Worker is running' });
+        }
+        
         if (url.pathname === '/api/parse' || url.pathname.endsWith('/api/parse')) {
             if (request.method === 'POST') {
                 return handleParse(request);
@@ -193,7 +198,6 @@ function handleOptions() {
     return new Response(null, {
         status: 204,
         headers: {
-            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type'
