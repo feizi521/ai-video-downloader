@@ -1,5 +1,5 @@
 // Cloudflare Worker - 视频解析服务
-// 使用 Cobalt 和 ytdown API
+// 使用多个可靠的解析 API
 
 const SUPPORTED_PLATFORMS = {
     douyin: { name: '抖音', domains: ['douyin.com', 'iesdouyin.com'], contentType: 'video' },
@@ -48,82 +48,35 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 尝试 Cobalt API
+        // 尝试 savefrom.net API (通过 savefrom.do)
         try {
-            console.log('Trying Cobalt API...');
-            const cobaltResponse = await fetch('https://co.wuk.sh/api/json', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    url: url, 
-                    vCodec: 'h264', 
-                    vQuality: '720', 
-                    aFormat: 'best', 
-                    isAudioOnly: false, 
-                    isNoTTWatermark: true 
-                })
-            });
-
-            console.log('Cobalt response status:', cobaltResponse.status);
-
-            if (cobaltResponse.ok) {
-                const data = await cobaltResponse.json();
-                console.log('Cobalt response:', JSON.stringify(data));
-                
-                if (data.status === 'success' && data.url) {
-                    console.log('Found video URL from Cobalt:', data.url);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: `${platformInfo.name}视频`,
-                            thumbnail: '',
-                            downloadUrl: data.url,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
-                }
-            }
-        } catch (cobaltError) {
-            console.error('Cobalt error:', cobaltError.message);
-        }
-
-        // 尝试 ytdown API
-        try {
-            console.log('Trying ytdown API...');
-            const ytdownUrl = `https://ytdown.vercel.app/api/download?url=${encodeURIComponent(url)}`;
-            const ytdownResponse = await fetch(ytdownUrl, {
+            console.log('Trying savefrom API...');
+            const savefromUrl = `https://savefrom.do/api/v1/info?url=${encodeURIComponent(url)}`;
+            const response = await fetch(savefromUrl, {
                 method: 'GET',
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
             });
 
-            console.log('ytdown response status:', ytdownResponse.status);
+            console.log('savefrom response status:', response.status);
 
-            if (ytdownResponse.ok) {
-                const data = await ytdownResponse.json();
-                console.log('ytdown response:', JSON.stringify(data));
+            if (response.ok) {
+                const data = await response.json();
+                console.log('savefrom response:', JSON.stringify(data).substring(0, 500));
                 
-                if (data.url) {
-                    console.log('Found video URL from ytdown:', data.url);
+                if (data.url || (data.data && data.data.url)) {
+                    const videoUrl = data.url || data.data.url;
+                    console.log('Found video URL from savefrom:', videoUrl);
                     return jsonResponse({
                         success: true,
                         data: {
                             url: url,
                             platform: platformInfo.name,
                             contentType: platformInfo.contentType,
-                            title: data.title || `${platformInfo.name}视频`,
-                            thumbnail: data.thumbnail || '',
-                            downloadUrl: data.url,
+                            title: data.title || data.data?.title || `${platformInfo.name}视频`,
+                            thumbnail: data.thumbnail || data.data?.thumbnail || '',
+                            downloadUrl: videoUrl,
                             duration: 0,
                             fileSize: 0,
                             message: '解析成功'
@@ -131,8 +84,88 @@ async function handleParse(request) {
                     });
                 }
             }
-        } catch (ytdownError) {
-            console.error('ytdown error:', ytdownError.message);
+        } catch (error) {
+            console.error('savefrom error:', error.message);
+        }
+
+        // 尝试 ssyoutube API
+        try {
+            console.log('Trying ssyoutube API...');
+            const ssyoutubeUrl = `https://ssyoutube.com/api/convert?url=${encodeURIComponent(url)}`;
+            const response = await fetch(ssyoutubeUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            console.log('ssyoutube response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('ssyoutube response:', JSON.stringify(data).substring(0, 500));
+                
+                if (data.url || (data.data && data.data.url)) {
+                    const videoUrl = data.url || data.data.url;
+                    console.log('Found video URL from ssyoutube:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: data.title || data.data?.title || `${platformInfo.name}视频`,
+                            thumbnail: data.thumbnail || data.data?.thumbnail || '',
+                            downloadUrl: videoUrl,
+                            duration: 0,
+                            fileSize: 0,
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('ssyoutube error:', error.message);
+        }
+
+        // 尝试 y2mate API
+        try {
+            console.log('Trying y2mate API...');
+            const y2mateUrl = `https://y2mate.com/api/v1/info?url=${encodeURIComponent(url)}`;
+            const response = await fetch(y2mateUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            console.log('y2mate response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('y2mate response:', JSON.stringify(data).substring(0, 500));
+                
+                if (data.url || (data.data && data.data.url)) {
+                    const videoUrl = data.url || data.data.url;
+                    console.log('Found video URL from y2mate:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: data.title || data.data?.title || `${platformInfo.name}视频`,
+                            thumbnail: data.thumbnail || data.data?.thumbnail || '',
+                            downloadUrl: videoUrl,
+                            duration: 0,
+                            fileSize: 0,
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('y2mate error:', error.message);
         }
 
         return jsonResponse({ success: false, message: '所有解析接口都失败了，请稍后再试' }, 500);
@@ -160,6 +193,7 @@ function handleOptions() {
     return new Response(null, {
         status: 204,
         headers: {
+            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type'
