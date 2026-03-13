@@ -239,10 +239,11 @@ class VideoDownloader {
         document.getElementById('duration').textContent = data.duration ? `时长: ${this.formatDuration(data.duration)}` : '';
         document.getElementById('fileSize').textContent = data.fileSize ? `大小: ${this.formatFileSize(data.fileSize)}` : '';
         
-        // 显示消息（如果有）
-        if (data.message) {
-            this.showMessage(data.message, 'info');
-        }
+        // 显示统一的下载提示消息（覆盖API返回的特殊提示）
+        const messageBox = document.getElementById('messageBox');
+        messageBox.textContent = '点击"直接下载"按钮即可下载视频，或使用"复制链接"复制下载地址';
+        messageBox.className = 'message-box info';
+        messageBox.classList.remove('hidden');
         
         this.resultSection.classList.remove('hidden');
         this.errorSection.classList.add('hidden');
