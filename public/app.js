@@ -1,9 +1,52 @@
-// API 配置 - 自动检测环境
-// 本地开发时使用 Python 后端 (端口 5000)，生产环境使用 Cloudflare Workers
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? `http://${window.location.hostname}:5000/api`
-    : 'https://jxhoutai.farholme.com/api';
-const BACKEND_API = API_BASE;
+// API 配置 - 纯前端方案，直接调用第三方解析API
+const VIDEO_PARSER_APIS = [
+    {
+        name: 'API1',
+        url: 'https://api.pearktrue.cn/api/video/parse/',
+        method: 'GET',
+        paramName: 'url'
+    },
+    {
+        name: 'API2',
+        url: 'https://api.linhun.vip/api/VideoParse',
+        method: 'GET',
+        paramName: 'url'
+    }
+];
+
+// 支持的平台
+const SUPPORTED_PLATFORMS = {
+    douyin: {
+        name: '抖音',
+        domains: ['douyin.com', 'iesdouyin.com'],
+        contentType: 'video'
+    },
+    kuaishou: {
+        name: '快手',
+        domains: ['kuaishou.com', 'chenzhongtech.com'],
+        contentType: 'video'
+    },
+    bilibili: {
+        name: 'B站',
+        domains: ['bilibili.com', 'b23.tv'],
+        contentType: 'video'
+    },
+    youtube: {
+        name: 'YouTube',
+        domains: ['youtube.com', 'youtu.be'],
+        contentType: 'video'
+    },
+    xiaohongshu: {
+        name: '小红书',
+        domains: ['xiaohongshu.com', 'xhslink.com'],
+        contentType: 'image'
+    },
+    weibo: {
+        name: '微博',
+        domains: ['weibo.com', 'weibo.cn'],
+        contentType: 'mixed'
+    }
+};
 
 // 确保使用 HTTPS
 function ensureHttps(url) {
@@ -107,32 +150,25 @@ class VideoDownloader {
             return;
         }
 
+        // 识别平台
+        const platformInfo = this.identifyPlatform(url);
+        if (!platformInfo) {
+            this.showError('不支持的平台或链接格式不正确');
+            return;
+        }
+
         this.setLoading(true);
         this.hideResults();
 
         try {
-            // 直接使用 Cloudflare API
-            const apiUrl = ensureHttps(`${API_BASE}/parse`);
-            console.log('API 调用地址:', apiUrl);
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ url }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                this.showResult(data.data);
-                this.addToHistory(data.data);
+            // 纯前端方案：直接调用解析API
+            const parseResult = await this.parseWithAPIs(url, platformInfo);
+            
+            if (parseResult.success) {
+                this.showResult(parseResult.data);
+                this.addToHistory(parseResult.data);
             } else {
-                this.showError(data.message || '解析失败，请检查链接');
+                this.showError(parseResult.message || '解析失败，请检查链接');
             }
         } catch (error) {
             console.error('Parse error:', error);
@@ -254,12 +290,91 @@ class VideoDownloader {
         this.currentPlatform = data.platform;
         this.downloadId = data.downloadId || '';
         
-        // 如果有 downloadId，修改按钮文字
-        if (this.downloadId) {
-            document.getElementById('downloadBtn').innerHTML = '<span>⬇️ 直接下载</span>';
-        } else {
-            document.getElementById('downloadBtn').innerHTML = '<span>⬇️ 去下载页面</span>';
+        // 纯前端方案：直接下载
+        document.getElementById('downloadBtn').innerHTML = '<span>⬇️ 直接下载</span>';
+    }
+
+    // 识别平台
+    identifyPlatform(url) {
+        try {
+            const urlObj = new URL(url);
+            const hostname = urlObj.hostname.toLowerCase();
+            
+            for (const [key, platform] of Object.entries(SUPPORTED_PLATFORMS)) {
+                if (platform.domains.some(domain => hostname.includes(domain))) {
+                    return { key, ...platform };
+                }
+            }
+            
+            return null;
+        } catch {
+            return null;
         }
+    }
+
+    // 纯前端解析：尝试多个API
+    async parseWithAPIs(url, platformInfo) {
+        for (const api of VIDEO_PARSER_APIS) {
+            try {
+                console.log(`尝试使用 ${api.name} 解析...`);
+                
+                const apiUrl = new URL(api.url);
+                apiUrl.searchParams.append(api.paramName, url);
+                
+                const response = await fetch(apiUrl.toString(), {
+                    method: api.method,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // 处理不同API的返回格式
+                    let videoUrl = null;
+                    let title = null;
+                    let cover = null;
+                    
+                    if (data.video) {
+                        // API1 格式
+                        videoUrl = data.video;
+                        title = data.title;
+                        cover = data.cover;
+                    } else if (data.data && data.data.video) {
+                        // API2 格式
+                        videoUrl = data.data.video;
+                        title = data.data.title;
+                        cover = data.data.cover;
+                    }
+                    
+                    if (videoUrl) {
+                        console.log(`${api.name} 解析成功`);
+                        return {
+                            success: true,
+                            data: {
+                                url: url,
+                                platform: platformInfo.name,
+                                contentType: platformInfo.contentType,
+                                title: title || `${platformInfo.name}视频`,
+                                thumbnail: cover || '',
+                                downloadUrl: videoUrl,
+                                duration: 0,
+                                fileSize: 0,
+                                message: '解析成功，点击下载按钮即可下载视频'
+                            }
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error(`${api.name} 解析失败:`, error);
+            }
+        }
+        
+        return { 
+            success: false, 
+            message: '所有解析API都失败了，请稍后重试或使用其他工具' 
+        };
     }
 
     showError(message) {
