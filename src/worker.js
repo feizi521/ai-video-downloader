@@ -1,54 +1,33 @@
-import { parseHandler } from '../functions/api/parse.js';
-import { downloadHandler } from '../functions/api/download.js';
+// Cloudflare Worker 入口文件
+// 转发请求到 functions/api/parse.js
+
+import { onRequestPost, onRequestGet, onRequestOptions } from '../functions/api/parse.js';
 
 export default {
-    async fetch(request, env, ctx) {
-        const url = new URL(request.url);
-        const path = url.pathname;
-
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'
-        };
-
-        if (request.method === 'OPTIONS') {
-            return new Response(null, { status: 204, headers: corsHeaders });
-        }
-
-        try {
-            if (path === '/api/parse') {
-                if (request.method === 'POST') {
-                    return await parseHandler({ request, env, ctx });
-                }
-                return jsonResponse({ success: false, message: '请使用 POST 方法' }, 405, corsHeaders);
-            }
-
-            if (path === '/api/download') {
-                if (request.method === 'GET') {
-                    return await downloadHandler({ request, env, ctx });
-                }
-                return jsonResponse({ success: false, message: '请使用 GET 方法' }, 405, corsHeaders);
-            }
-
-            if (path === '/api/health') {
-                return jsonResponse({ status: 'ok', message: '服务正常运行' }, 200, corsHeaders);
-            }
-
-            return jsonResponse({ success: false, message: '接口不存在' }, 404, corsHeaders);
-        } catch (error) {
-            console.error('Worker error:', error);
-            return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500, corsHeaders);
-        }
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    
+    // 只处理 /api/parse 路径
+    if (url.pathname === '/api/parse') {
+      if (request.method === 'POST') {
+        return onRequestPost({ request, env, ctx });
+      } else if (request.method === 'GET') {
+        return onRequestGet({ request, env, ctx });
+      } else if (request.method === 'OPTIONS') {
+        return onRequestOptions();
+      }
     }
-};
-
-function jsonResponse(data, status = 200, headers = {}) {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: {
-            'Content-Type': 'application/json',
-            ...headers
-        }
+    
+    // 其他路径返回 404
+    return new Response(JSON.stringify({
+      success: false,
+      message: 'Not Found'
+    }), {
+      status: 404,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     });
-}
+  }
+};
