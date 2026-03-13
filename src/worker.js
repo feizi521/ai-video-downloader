@@ -1,5 +1,5 @@
 // Cloudflare Worker - 视频解析服务
-// 使用第三方解析网站链接
+// 使用多个可用的解析 API
 
 const SUPPORTED_PLATFORMS = {
     douyin: { name: '抖音', domains: ['douyin.com', 'iesdouyin.com'], contentType: 'video' },
@@ -12,14 +12,6 @@ const SUPPORTED_PLATFORMS = {
     instagram: { name: 'Instagram', domains: ['instagram.com'], contentType: 'video' },
     facebook: { name: 'Facebook', domains: ['facebook.com', 'fb.watch'], contentType: 'video' }
 };
-
-// 第三方解析网站
-const PARSER_SITES = [
-    { name: 'SnapAny', url: 'https://snapany.com', param: '#' },
-    { name: 'SaveFrom', url: 'https://savefrom.net', param: '/?url=' },
-    { name: 'Y2mate', url: 'https://y2mate.com', param: '/?url=' },
-    { name: 'SSYouTube', url: 'https://ssyoutube.com', param: '/?url=' }
-];
 
 export default {
     async fetch(request, env, ctx) {
@@ -60,35 +52,206 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 生成第三方解析网站链接
-        const parserLinks = PARSER_SITES.map(site => ({
-            name: site.name,
-            url: `${site.url}${site.param}${encodeURIComponent(url)}`
-        }));
+        // API 1: yyy001.com
+        try {
+            console.log('Trying yyy001.com API...');
+            const apiUrl = `https://api.yyy001.com/api/videoparse?url=${encodeURIComponent(url)}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                }
+            });
 
-        console.log('Generated parser links:', parserLinks);
+            console.log('yyy001.com response status:', response.status);
 
-        return jsonResponse({
-            success: true,
-            data: {
-                url: url,
-                platform: platformInfo.name,
-                contentType: platformInfo.contentType,
-                title: `${platformInfo.name}视频`,
-                thumbnail: '',
-                downloadUrl: parserLinks[0].url,  // 默认使用第一个
-                parserLinks: parserLinks,          // 所有解析链接
-                duration: 0,
-                fileSize: 0,
-                message: '请选择下方链接下载',
-                type: 'third_party'
+            if (response.ok) {
+                const data = await response.json();
+                console.log('yyy001.com response:', JSON.stringify(data).substring(0, 1000));
+                
+                const videoUrl = extractVideoUrl(data);
+                if (videoUrl) {
+                    console.log('Found video URL from yyy001.com:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: extractTitle(data, platformInfo.name),
+                            thumbnail: extractThumbnail(data),
+                            downloadUrl: videoUrl,
+                            duration: extractDuration(data),
+                            fileSize: extractFileSize(data),
+                            message: '解析成功'
+                        }
+                    });
+                }
             }
-        });
+        } catch (error) {
+            console.error('yyy001.com error:', error.message);
+        }
+
+        // API 2: jkapi.com
+        try {
+            console.log('Trying jkapi.com API...');
+            const apiUrl = `https://jkapi.com/api/jx_all?url=${encodeURIComponent(url)}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                }
+            });
+
+            console.log('jkapi.com response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('jkapi.com response:', JSON.stringify(data).substring(0, 1000));
+                
+                const videoUrl = extractVideoUrl(data);
+                if (videoUrl) {
+                    console.log('Found video URL from jkapi.com:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: extractTitle(data, platformInfo.name),
+                            thumbnail: extractThumbnail(data),
+                            downloadUrl: videoUrl,
+                            duration: extractDuration(data),
+                            fileSize: extractFileSize(data),
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('jkapi.com error:', error.message);
+        }
+
+        // API 3: obtaindown.com
+        try {
+            console.log('Trying obtaindown.com API...');
+            const apiUrl = `https://api.obtaindown.com/obApi/api/analysis?url=${encodeURIComponent(url)}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                }
+            });
+
+            console.log('obtaindown.com response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('obtaindown.com response:', JSON.stringify(data).substring(0, 1000));
+                
+                const videoUrl = extractVideoUrl(data);
+                if (videoUrl) {
+                    console.log('Found video URL from obtaindown.com:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: extractTitle(data, platformInfo.name),
+                            thumbnail: extractThumbnail(data),
+                            downloadUrl: videoUrl,
+                            duration: extractDuration(data),
+                            fileSize: extractFileSize(data),
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('obtaindown.com error:', error.message);
+        }
+
+        // API 4: alapi.cn
+        try {
+            console.log('Trying alapi.cn API...');
+            const apiUrl = `https://v1.alapi.cn/api/video/url?url=${encodeURIComponent(url)}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                }
+            });
+
+            console.log('alapi.cn response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('alapi.cn response:', JSON.stringify(data).substring(0, 1000));
+                
+                const videoUrl = extractVideoUrl(data);
+                if (videoUrl) {
+                    console.log('Found video URL from alapi.cn:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: extractTitle(data, platformInfo.name),
+                            thumbnail: extractThumbnail(data),
+                            downloadUrl: videoUrl,
+                            duration: extractDuration(data),
+                            fileSize: extractFileSize(data),
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('alapi.cn error:', error.message);
+        }
+
+        return jsonResponse({ success: false, message: '所有解析接口都失败了，请稍后再试' }, 500);
 
     } catch (error) {
         console.error('Parse error:', error.message);
         return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500);
     }
+}
+
+// 提取视频 URL
+function extractVideoUrl(data) {
+    const d = data.data || data.result || data;
+    return d.videoUrl || d.url || d.playUrl || d.downloadUrl || d.video_url || d.play_url || d.src || d.video;
+}
+
+// 提取标题
+function extractTitle(data, defaultTitle) {
+    const d = data.data || data.result || data;
+    return d.title || d.desc || d.description || d.name || defaultTitle;
+}
+
+// 提取缩略图
+function extractThumbnail(data) {
+    const d = data.data || data.result || data;
+    return d.cover || d.thumbnail || d.pic || d.image || d.poster || '';
+}
+
+// 提取时长
+function extractDuration(data) {
+    const d = data.data || data.result || data;
+    return d.duration || d.time || 0;
+}
+
+// 提取文件大小
+function extractFileSize(data) {
+    const d = data.data || data.result || data;
+    return d.size || d.fileSize || 0;
 }
 
 function identifyPlatform(url) {
