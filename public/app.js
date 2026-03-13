@@ -197,25 +197,43 @@ class VideoDownloader {
         try {
             this.showMessage('正在准备下载...', 'info');
             
-            // 方法1: 尝试直接下载（创建临时链接）
-            const a = document.createElement('a');
-            a.href = this.currentDownloadUrl;
-            a.download = ''; // 让浏览器自动处理文件名
-            a.target = '_blank'; // 在新标签页打开，避免当前页跳转
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // 方法: 使用 iframe 静默下载，避免跳转
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = this.currentDownloadUrl;
+            document.body.appendChild(iframe);
+            
+            // 3秒后移除 iframe
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 3000);
             
             this.showMessage('下载已开始！如果未自动下载，请使用"复制链接"功能', 'success');
 
         } catch (error) {
             console.error('Download error:', error);
-            // 如果直接下载失败，提示用户复制链接
-            this.showMessage('自动下载失败，请使用"复制链接"按钮复制链接后下载', 'error');
+            // 如果 iframe 下载失败，使用备用方法
+            this.fallbackDownload();
         } finally {
             this.isDownloading = false;
             downloadBtn.innerHTML = originalText;
             downloadBtn.disabled = false;
+        }
+    }
+    
+    fallbackDownload() {
+        // 备用方法：尝试使用 a 标签下载
+        try {
+            const a = document.createElement('a');
+            a.href = this.currentDownloadUrl;
+            a.download = 'video.mp4';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Fallback download error:', error);
+            this.showMessage('自动下载失败，请使用"复制链接"按钮复制链接后下载', 'error');
         }
     }
 
