@@ -12,22 +12,10 @@ const SUPPORTED_PLATFORMS = {
 const VIDEO_PARSER_APIS = [
     {
         name: 'API1',
-        url: 'https://api.pearktrue.cn/api/video/parse/',
-        paramName: 'url',
-        handler: (data) => {
-            console.log('API1 response:', JSON.stringify(data).substring(0, 200));
-            if (data && data.video) {
-                return { title: data.title, cover: data.cover, downloadUrl: data.video };
-            }
-            return null;
-        }
-    },
-    {
-        name: 'API2',
         url: 'https://api.linhun.vip/api/VideoParse',
         paramName: 'url',
         handler: (data) => {
-            console.log('API2 response:', JSON.stringify(data).substring(0, 200));
+            console.log('API1 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.data && data.data.video) {
                 return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video };
             }
@@ -35,11 +23,11 @@ const VIDEO_PARSER_APIS = [
         }
     },
     {
-        name: 'API3',
+        name: 'API2',
         url: 'https://api.vvhan.com/api/video',
         paramName: 'url',
         handler: (data) => {
-            console.log('API3 response:', JSON.stringify(data).substring(0, 200));
+            console.log('API2 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.data && data.data.url) {
                 return { title: data.data.title, cover: data.data.pic, downloadUrl: data.data.url };
             }
@@ -47,11 +35,11 @@ const VIDEO_PARSER_APIS = [
         }
     },
     {
-        name: 'API4',
+        name: 'API3',
         url: 'https://api.asdj.cn/api/video/parse',
         paramName: 'url',
         handler: (data) => {
-            console.log('API4 response:', JSON.stringify(data).substring(0, 200));
+            console.log('API3 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.video) {
                 return { title: data.title, cover: data.cover, downloadUrl: data.video };
             }
@@ -59,11 +47,11 @@ const VIDEO_PARSER_APIS = [
         }
     },
     {
-        name: 'API5',
+        name: 'API4',
         url: 'https://api.mhimg.cn/api/video/parse',
         paramName: 'url',
         handler: (data) => {
-            console.log('API5 response:', JSON.stringify(data).substring(0, 200));
+            console.log('API4 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.code === 200 && data.data && data.data.video_url) {
                 return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video_url };
             }
@@ -71,11 +59,11 @@ const VIDEO_PARSER_APIS = [
         }
     },
     {
-        name: 'API6',
+        name: 'API5',
         url: 'https://api.52vmy.cn/api/video/parse',
         paramName: 'url',
         handler: (data) => {
-            console.log('API6 response:', JSON.stringify(data).substring(0, 200));
+            console.log('API5 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.code === 200 && data.data && data.data.video) {
                 return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video };
             }
@@ -83,11 +71,11 @@ const VIDEO_PARSER_APIS = [
         }
     },
     {
-        name: 'API7',
+        name: 'API6',
         url: 'https://api.xiaoxiaoapi.com/api/video/parse',
         paramName: 'url',
         handler: (data) => {
-            console.log('API7 response:', JSON.stringify(data).substring(0, 200));
+            console.log('API6 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.code === 200 && data.data && data.data.video_url) {
                 return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video_url };
             }
@@ -95,11 +83,47 @@ const VIDEO_PARSER_APIS = [
         }
     },
     {
-        name: 'API8',
+        name: 'API7',
         url: 'https://api.iyk0.com/shipin/',
         paramName: 'url',
         handler: (data) => {
+            console.log('API7 response:', JSON.stringify(data).substring(0, 200));
+            if (data && data.code === 200 && data.data && data.data.video) {
+                return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API8',
+        url: 'https://api.yujn.cn/api/video/parse',
+        paramName: 'url',
+        handler: (data) => {
             console.log('API8 response:', JSON.stringify(data).substring(0, 200));
+            if (data && data.code === 200 && data.data && data.data.video) {
+                return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API9',
+        url: 'https://api.cl6z.cn/api/video/parse',
+        paramName: 'url',
+        handler: (data) => {
+            console.log('API9 response:', JSON.stringify(data).substring(0, 200));
+            if (data && data.code === 200 && data.data && data.data.video_url) {
+                return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video_url };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API10',
+        url: 'https://api.xn--7gqa009f.cn/api/video/parse',
+        paramName: 'url',
+        handler: (data) => {
+            console.log('API10 response:', JSON.stringify(data).substring(0, 200));
             if (data && data.code === 200 && data.data && data.data.video) {
                 return { title: data.data.title, cover: data.data.cover, downloadUrl: data.data.video };
             }
@@ -238,6 +262,7 @@ function handleOptions() {
     return new Response(null, {
         status: 204,
         headers: {
+            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type'
