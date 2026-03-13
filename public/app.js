@@ -186,6 +186,8 @@ class VideoDownloader {
     }
 
     async directDownload() {
+        if (!this.currentDownloadUrl) return;
+        
         this.isDownloading = true;
         const downloadBtn = document.getElementById('downloadBtn');
         const originalText = downloadBtn.innerHTML;
@@ -193,64 +195,23 @@ class VideoDownloader {
         downloadBtn.disabled = true;
 
         try {
-            this.showMessage('正在获取视频，请稍候...', 'info');
-
-            // 使用 fetch 获取视频文件
-            const response = await fetch(this.currentDownloadUrl, {
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            // 获取文件大小
-            const contentLength = response.headers.get('content-length');
-            const totalSize = contentLength ? parseInt(contentLength) : 0;
-
-            // 获取文件名
-            let filename = 'video.mp4';
-            const contentDisposition = response.headers.get('content-disposition');
-            if (contentDisposition) {
-                const match = contentDisposition.match(/filename="?([^"]+)"?/);
-                if (match) filename = match[1];
-            } else {
-                // 从 URL 中提取文件名
-                const urlObj = new URL(this.currentDownloadUrl);
-                const pathname = urlObj.pathname;
-                const ext = pathname.split('.').pop();
-                if (ext && ext.length <= 5) {
-                    filename = `video_${Date.now()}.${ext}`;
-                }
-            }
-
-            // 读取响应体
-            const blob = await response.blob();
+            this.showMessage('正在准备下载...', 'info');
             
-            // 检查文件大小，如果太小可能是错误页面
-            if (blob.size < 10000) {
-                this.showMessage('视频获取失败，链接可能已过期或需要登录', 'error');
-                return;
-            }
-
-            // 创建下载链接
-            const downloadUrl = window.URL.createObjectURL(blob);
+            // 方法1: 尝试直接下载（创建临时链接）
             const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filename;
+            a.href = this.currentDownloadUrl;
+            a.download = ''; // 让浏览器自动处理文件名
+            a.target = '_blank'; // 在新标签页打开，避免当前页跳转
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            window.URL.revokeObjectURL(downloadUrl);
-
-            this.showMessage('下载已开始！', 'success');
+            
+            this.showMessage('下载已开始！如果未自动下载，请使用"复制链接"功能', 'success');
 
         } catch (error) {
             console.error('Download error:', error);
-            this.showMessage('下载失败，请复制链接使用其他下载工具', 'error');
+            // 如果直接下载失败，提示用户复制链接
+            this.showMessage('自动下载失败，请使用"复制链接"按钮复制链接后下载', 'error');
         } finally {
             this.isDownloading = false;
             downloadBtn.innerHTML = originalText;
