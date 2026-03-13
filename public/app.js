@@ -145,94 +145,81 @@ class VideoDownloader {
     async downloadVideo() {
         if (!this.currentDownloadUrl || this.isDownloading) return;
 
-        // 如果有 downloadId，使用后端直接下载
-        if (this.downloadId) {
-            await this.downloadWithBackend();
-        } else {
-            // 否则使用原来的方式（打开第三方页面）
-            this.goToDownloadPage();
-        }
+        // 直接使用解析后的下载链接进行下载
+        await this.directDownload();
     }
 
-    async downloadWithBackend() {
+    async directDownload() {
         this.isDownloading = true;
         const downloadBtn = document.getElementById('downloadBtn');
         const originalText = downloadBtn.innerHTML;
-        downloadBtn.innerHTML = '<span>⏳ 下载中...</span>';
+        downloadBtn.innerHTML = '<span>⏳ 准备下载...</span>';
         downloadBtn.disabled = true;
 
         try {
-            this.showMessage('正在下载视频，请稍候...', 'info');
+            this.showMessage('正在获取视频，请稍候...', 'info');
 
-            const response = await fetch(`${BACKEND_API}/download`, {
-                method: 'POST',
+            // 使用 fetch 获取视频文件
+            const response = await fetch(this.currentDownloadUrl, {
+                method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    url: this.currentDownloadUrl,
-                    downloadId: this.downloadId
-                }),
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
             });
 
-            if (response.ok) {
-                // 获取文件名
-                const contentDisposition = response.headers.get('content-disposition');
-                let filename = 'video.mp4';
-                if (contentDisposition) {
-                    const match = contentDisposition.match(/filename="(.+)"/);
-                    if (match) filename = match[1];
-                }
-
-                // 下载文件
-                const blob = await response.blob();
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(downloadUrl);
-
-                this.showMessage('下载完成！', 'success');
-
-                // 清理临时文件
-                await fetch(`${BACKEND_API}/cleanup`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ downloadId: this.downloadId }),
-                });
-            } else {
-                const data = await response.json();
-                this.showMessage(data.message || '下载失败', 'error');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            // 获取文件大小
+            const contentLength = response.headers.get('content-length');
+            const totalSize = contentLength ? parseInt(contentLength) : 0;
+
+            // 获取文件名
+            let filename = 'video.mp4';
+            const contentDisposition = response.headers.get('content-disposition');
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match) filename = match[1];
+            } else {
+                // 从 URL 中提取文件名
+                const urlObj = new URL(this.currentDownloadUrl);
+                const pathname = urlObj.pathname;
+                const ext = pathname.split('.').pop();
+                if (ext && ext.length <= 5) {
+                    filename = `video_${Date.now()}.${ext}`;
+                }
+            }
+
+            // 读取响应体
+            const blob = await response.blob();
+            
+            // 检查文件大小，如果太小可能是错误页面
+            if (blob.size < 10000) {
+                this.showMessage('视频获取失败，链接可能已过期或需要登录', 'error');
+                return;
+            }
+
+            // 创建下载链接
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+
+            this.showMessage('下载已开始！', 'success');
+
         } catch (error) {
             console.error('Download error:', error);
-            this.showMessage('下载失败，请检查后端服务是否运行', 'error');
+            this.showMessage('下载失败，请复制链接使用其他下载工具', 'error');
         } finally {
             this.isDownloading = false;
             downloadBtn.innerHTML = originalText;
             downloadBtn.disabled = false;
         }
-    }
-
-    goToDownloadPage() {
-        if (!this.currentDownloadUrl) return;
-
-        // 如果是B站，提示使用本地工具
-        if (this.currentPlatform === 'B站') {
-            this.showMessage('B站视频请使用 you-get 或 yt-dlp 工具下载，或复制链接使用浏览器扩展', 'info');
-            return;
-        }
-
-        // 打开第三方下载页面
-        window.open(this.currentDownloadUrl, '_blank');
-        
-        // 显示提示信息
-        this.showMessage('已打开下载页面，请在下载页面中下载视频', 'info');
     }
 
     async copyLink() {

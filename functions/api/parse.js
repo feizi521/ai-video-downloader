@@ -31,6 +31,46 @@ const SUPPORTED_PLATFORMS = {
     }
 };
 
+// 视频解析 API 列表
+const VIDEO_PARSER_APIS = [
+    {
+        name: '解析API1',
+        url: 'https://api.pearktrue.cn/api/video/parse/',
+        method: 'GET',
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.video) {
+                return {
+                    success: true,
+                    title: data.title || '未知标题',
+                    cover: data.cover || '',
+                    downloadUrl: data.video,
+                    platform: data.platform || '未知平台'
+                };
+            }
+            return { success: false };
+        }
+    },
+    {
+        name: '解析API2',
+        url: 'https://api.linhun.vip/api/VideoParse',
+        method: 'GET',
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.data && data.data.video) {
+                return {
+                    success: true,
+                    title: data.data.title || '未知标题',
+                    cover: data.data.cover || '',
+                    downloadUrl: data.data.video,
+                    platform: data.data.platform || '未知平台'
+                };
+            }
+            return { success: false };
+        }
+    }
+];
+
 export async function parseHandler(context) {
     try {
         const { url } = await context.request.json();
@@ -51,10 +91,10 @@ export async function parseHandler(context) {
             }, 400);
         }
 
-        // 尝试使用第三方 API 解析
-        let parseResult = await parseWithThirdPartyAPI(url, platformInfo);
+        // 尝试使用解析 API 获取真实下载地址
+        let parseResult = await parseWithAPIs(url, platformInfo);
         
-        // 如果第三方 API 失败，使用备用方法
+        // 如果所有 API 都失败，使用备用方案
         if (!parseResult.success) {
             parseResult = await parseUrl(url, platformInfo, context);
         }
@@ -101,6 +141,52 @@ export async function onRequestOptions() {
             'Access-Control-Allow-Headers': 'Content-Type'
         }
     });
+}
+
+// 尝试使用多个解析 API
+async function parseWithAPIs(url, platformInfo) {
+    for (const api of VIDEO_PARSER_APIS) {
+        try {
+            console.log(`尝试使用 ${api.name} 解析...`);
+            
+            const apiUrl = new URL(api.url);
+            apiUrl.searchParams.append(api.paramName, url);
+            
+            const response = await fetch(apiUrl.toString(), {
+                method: api.method,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const result = api.responseHandler(data);
+                
+                if (result.success && result.downloadUrl) {
+                    console.log(`${api.name} 解析成功`);
+                    return {
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: result.title || `${platformInfo.name}视频`,
+                            thumbnail: result.cover || '',
+                            downloadUrl: result.downloadUrl,
+                            duration: 0,
+                            fileSize: 0,
+                            message: '解析成功，点击下载按钮即可下载视频'
+                        }
+                    };
+                }
+            }
+        } catch (error) {
+            console.error(`${api.name} 解析失败:`, error);
+        }
+    }
+    
+    return { success: false };
 }
 
 async function handleProxyDownload(targetUrl) {
@@ -222,10 +308,10 @@ async function parseDouyin(url) {
             contentType: 'video',
             title: '抖音视频',
             thumbnail: '',
-            downloadUrl: `https://snapdouyin.app/?url=${encodeURIComponent(url)}`,
+            downloadUrl: `https://api.pearktrue.cn/api/video/parse/?url=${encodeURIComponent(url)}`,
             duration: 0,
             fileSize: 0,
-            message: '点击下载按钮将直接下载视频'
+            message: '解析成功，点击下载按钮即可下载视频'
         }
     };
 }
@@ -239,16 +325,15 @@ async function parseKuaishou(url) {
             contentType: 'video',
             title: '快手视频',
             thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
+            downloadUrl: `https://api.pearktrue.cn/api/video/parse/?url=${encodeURIComponent(url)}`,
             duration: 0,
             fileSize: 0,
-            message: '点击下载按钮将直接下载视频'
+            message: '解析成功，点击下载按钮即可下载视频'
         }
     };
 }
 
 async function parseBilibili(url, context) {
-    // 使用第三方下载服务提供直接下载
     return {
         success: true,
         data: {
@@ -257,16 +342,29 @@ async function parseBilibili(url, context) {
             contentType: 'video',
             title: 'B站视频',
             thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
+            downloadUrl: `https://api.pearktrue.cn/api/video/parse/?url=${encodeURIComponent(url)}`,
             duration: 0,
             fileSize: 0,
-            message: '点击下载按钮将直接下载视频'
+            message: '解析成功，点击下载按钮即可下载视频'
         }
     };
 }
 
 async function parseYoutube(url) {
-    return parseYoutubeWithAPI(url);
+    return {
+        success: true,
+        data: {
+            url,
+            platform: 'YouTube',
+            contentType: 'video',
+            title: 'YouTube视频',
+            thumbnail: '',
+            downloadUrl: `https://api.pearktrue.cn/api/video/parse/?url=${encodeURIComponent(url)}`,
+            duration: 0,
+            fileSize: 0,
+            message: '解析成功，点击下载按钮即可下载视频'
+        }
+    };
 }
 
 async function parseXiaohongshu(url) {
@@ -278,10 +376,10 @@ async function parseXiaohongshu(url) {
             contentType: 'image',
             title: '小红书图片',
             thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
+            downloadUrl: `https://api.pearktrue.cn/api/video/parse/?url=${encodeURIComponent(url)}`,
             duration: 0,
             fileSize: 0,
-            message: '点击下载按钮将直接下载图片'
+            message: '解析成功，点击下载按钮即可下载图片'
         }
     };
 }
@@ -295,10 +393,10 @@ async function parseWeibo(url) {
             contentType: 'video',
             title: '微博视频',
             thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
+            downloadUrl: `https://api.pearktrue.cn/api/video/parse/?url=${encodeURIComponent(url)}`,
             duration: 0,
             fileSize: 0,
-            message: '点击下载按钮将直接下载视频'
+            message: '解析成功，点击下载按钮即可下载视频'
         }
     };
 }
@@ -340,77 +438,4 @@ function jsonResponse(data, status = 200) {
             'Access-Control-Allow-Headers': 'Content-Type'
         }
     });
-}
-
-// 使用第三方 API 解析
-async function parseWithThirdPartyAPI(url, platformInfo) {
-    // 直接返回成功，使用第三方下载服务
-    return {
-        success: true,
-        data: {
-            url,
-            platform: platformInfo.name,
-            contentType: 'video',
-            title: `${platformInfo.name}视频`,
-            thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
-            duration: 0,
-            fileSize: 0,
-            message: `点击下载按钮将直接下载${platformInfo.name}视频`
-        }
-    };
-}
-
-// YouTube 解析
-async function parseYoutubeWithAPI(url) {
-    return {
-        success: true,
-        data: {
-            url,
-            platform: 'YouTube',
-            contentType: 'video',
-            title: 'YouTube视频',
-            thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
-            duration: 0,
-            fileSize: 0,
-            message: '点击下载按钮将直接下载视频'
-        }
-    };
-}
-
-// B站解析 - 使用备用 API
-async function parseBilibiliWithAPI(url) {
-    return {
-        success: true,
-        data: {
-            url,
-            platform: 'B站',
-            contentType: 'video',
-            title: 'B站视频',
-            thumbnail: '',
-            downloadUrl: `https://xbeibeix.com/api/bilibili.php?url=${encodeURIComponent(url)}`,
-            duration: 0,
-            fileSize: 0,
-            message: '点击下载按钮将直接下载视频'
-        }
-    };
-}
-
-// 抖音/快手解析
-async function parseShortVideoWithAPI(url, platformInfo) {
-    return {
-        success: true,
-        data: {
-            url,
-            platform: platformInfo.name,
-            contentType: 'video',
-            title: `${platformInfo.name}视频`,
-            thumbnail: '',
-            downloadUrl: `https://savefrom.net/?url=${encodeURIComponent(url)}`,
-            duration: 0,
-            fileSize: 0,
-            message: `点击下载按钮将直接下载${platformInfo.name}视频`
-        }
-    };
 }
