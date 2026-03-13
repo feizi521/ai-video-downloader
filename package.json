@@ -1,0 +1,17 @@
+{
+  "name": "ai-video-downloader",
+  "version": "1.0.0",
+  "description": "AI智能解析视频图片链接下载网站",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "pages:dev": "npx wrangler pages dev ./public",
+    "pages:deploy": "npx wrangler pages deploy ./public"
+  },
+  "dependencies": {
+    "itty-router": "^4.0.20"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

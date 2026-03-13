@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI智能视频图片下载器</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AI智能视频图片下载器</h1>
+            <p class="subtitle">支持抖音、快手、B站、YouTube等主流平台</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="urlInput" 
+                        placeholder="请粘贴视频或图片链接..."
+                        autocomplete="off"
+                    >
+                    <button id="parseBtn" class="btn-primary">
+                        <span class="btn-text">智能解析</span>
+                        <span class="btn-loading">解析中...</span>
+                    </button>
+                </div>
+                <div class="supported-platforms">
+                    <span class="platform-tag">抖音</span>
+                    <span class="platform-tag">快手</span>
+                    <span class="platform-tag">B站</span>
+                    <span class="platform-tag">YouTube</span>
+                    <span class="platform-tag">更多</span>
+                </div>
+            </div>
+
+            <div id="resultSection" class="result-section hidden">
+                <div class="result-card">
+                    <div class="result-header">
+                        <h3 id="platformName">平台名称</h3>
+                        <span id="contentType" class="content-type">视频</span>
+                    </div>
+                    <div class="result-content">
+                        <div class="thumbnail-wrapper">
+                            <img id="thumbnail" src="" alt="缩略图">
+                        </div>
+                        <div class="info-section">
+                            <h4 id="title">标题</h4>
+                            <div class="meta-info">
+                                <span id="duration">时长: --:--</span>
+                                <span id="fileSize">大小: --</span>
+                            </div>
+                            <div class="download-options">
+                                <button id="downloadBtn" class="btn-download">
+                                    <span>⬇️ 去下载页面</span>
+                                </button>
+                                <button id="copyLinkBtn" class="btn-secondary">
+                                    <span>📋 复制链接</span>
+                                </button>
+                            </div>
+                            <div id="messageBox" class="message-box hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorSection" class="error-section hidden">
+                <div class="error-card">
+                    <span class="error-icon">⚠️</span>
+                    <p id="errorMessage">解析失败，请检查链接是否正确</p>
+                </div>
+            </div>
+
+            <div class="history-section">
+                <div class="history-header">
+                    <h3>📜 下载历史</h3>
+                    <button id="clearHistoryBtn" class="btn-text">清空历史</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <p class="empty-history">暂无下载记录</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>© 2024 AI智能下载器 | 使用 Cloudflare + GitHub 部署</p>
+        </footer>
+    </div>
+
+    <script src="app.js?v=3"></script>
+</body>
+</html>
