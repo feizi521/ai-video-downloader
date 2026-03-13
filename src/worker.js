@@ -52,7 +52,48 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // API 1: yyy001.com
+        // API 1: 创信 API (jxcxin.cn)
+        try {
+            console.log('Trying jxcxin.cn API...');
+            const apiUrl = `https://apis.jxcxin.cn/api/douyin?url=${encodeURIComponent(url)}`;
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                }
+            });
+
+            console.log('jxcxin.cn response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('jxcxin.cn response:', JSON.stringify(data).substring(0, 1000));
+                
+                const videoUrl = extractVideoUrl(data);
+                if (videoUrl) {
+                    console.log('Found video URL from jxcxin.cn:', videoUrl);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: extractTitle(data, platformInfo.name),
+                            thumbnail: extractThumbnail(data),
+                            downloadUrl: videoUrl,
+                            duration: extractDuration(data),
+                            fileSize: extractFileSize(data),
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('jxcxin.cn error:', error.message);
+        }
+
+        // API 2: yyy001.com
         try {
             console.log('Trying yyy001.com API...');
             const apiUrl = `https://api.yyy001.com/api/videoparse?url=${encodeURIComponent(url)}`;
@@ -93,7 +134,7 @@ async function handleParse(request) {
             console.error('yyy001.com error:', error.message);
         }
 
-        // API 2: jkapi.com
+        // API 3: jkapi.com
         try {
             console.log('Trying jkapi.com API...');
             const apiUrl = `https://jkapi.com/api/jx_all?url=${encodeURIComponent(url)}`;
@@ -134,7 +175,7 @@ async function handleParse(request) {
             console.error('jkapi.com error:', error.message);
         }
 
-        // API 3: obtaindown.com
+        // API 4: obtaindown.com
         try {
             console.log('Trying obtaindown.com API...');
             const apiUrl = `https://api.obtaindown.com/obApi/api/analysis?url=${encodeURIComponent(url)}`;
@@ -175,7 +216,7 @@ async function handleParse(request) {
             console.error('obtaindown.com error:', error.message);
         }
 
-        // API 4: alapi.cn
+        // API 5: alapi.cn
         try {
             console.log('Trying alapi.cn API...');
             const apiUrl = `https://v1.alapi.cn/api/video/url?url=${encodeURIComponent(url)}`;
