@@ -63,6 +63,38 @@ const VIDEO_PARSER_APIS = [
             }
             return null;
         }
+    },
+    {
+        name: 'API5',
+        url: 'https://api.mhimg.cn/api/video/parse',
+        method: 'GET',
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.code === 200 && data.data && data.data.video_url) {
+                return {
+                    title: data.data.title,
+                    cover: data.data.cover,
+                    downloadUrl: data.data.video_url
+                };
+            }
+            return null;
+        }
+    },
+    {
+        name: 'API6',
+        url: 'https://api.52vmy.cn/api/video/parse',
+        method: 'GET',
+        paramName: 'url',
+        responseHandler: (data) => {
+            if (data && data.code === 200 && data.data && data.data.video) {
+                return {
+                    title: data.data.title,
+                    cover: data.data.cover,
+                    downloadUrl: data.data.video
+                };
+            }
+            return null;
+        }
     }
 ];
 
@@ -346,6 +378,8 @@ class VideoDownloader {
 
     // 纯前端解析：尝试多个API
     async parseWithAPIs(url, platformInfo) {
+        let lastError = null;
+        
         for (const api of VIDEO_PARSER_APIS) {
             try {
                 console.log(`尝试使用 ${api.name} 解析...`);
@@ -353,12 +387,20 @@ class VideoDownloader {
                 const apiUrl = new URL(api.url);
                 apiUrl.searchParams.append(api.paramName, url);
                 
+                // 添加超时控制
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+                
                 const response = await fetch(apiUrl.toString(), {
                     method: api.method,
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    }
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept': 'application/json'
+                    },
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
                 
                 if (response.ok) {
                     const data = await response.json();
@@ -385,13 +427,22 @@ class VideoDownloader {
                     }
                 }
             } catch (error) {
-                console.error(`${api.name} 解析失败:`, error);
+                console.error(`${api.name} 解析失败:`, error.message || error);
+                lastError = error;
             }
+        }
+        
+        // 如果所有API都失败，返回更详细的错误信息
+        let errorMessage = '所有解析API都失败了';
+        if (lastError && lastError.name === 'TypeError' && lastError.message.includes('fetch')) {
+            errorMessage = '网络请求失败，可能是CORS跨域限制或网络问题';
+        } else if (lastError && lastError.name === 'AbortError') {
+            errorMessage = '请求超时，请检查网络连接';
         }
         
         return { 
             success: false, 
-            message: '所有解析API都失败了，请稍后重试或使用其他工具' 
+            message: errorMessage + '，请稍后重试或使用其他工具' 
         };
     }
 
