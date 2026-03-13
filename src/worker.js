@@ -53,7 +53,52 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 尝试 savefrom.net API (通过 savefrom.do)
+        // 尝试 SnapAny API
+        try {
+            console.log('Trying SnapAny API...');
+            const snapanyUrl = `https://snapany.com/api/v1/download`;
+            const response = await fetch(snapanyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json',
+                    'Origin': 'https://snapany.com',
+                    'Referer': 'https://snapany.com/'
+                },
+                body: JSON.stringify({ url: url })
+            });
+
+            console.log('SnapAny response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('SnapAny response:', JSON.stringify(data).substring(0, 1000));
+                
+                if (data.success && data.data && data.data.medias && data.data.medias.length > 0) {
+                    const media = data.data.medias[0];
+                    console.log('Found video URL from SnapAny:', media.url);
+                    return jsonResponse({
+                        success: true,
+                        data: {
+                            url: url,
+                            platform: platformInfo.name,
+                            contentType: platformInfo.contentType,
+                            title: data.data.title || `${platformInfo.name}视频`,
+                            thumbnail: data.data.cover || '',
+                            downloadUrl: media.url,
+                            duration: 0,
+                            fileSize: 0,
+                            message: '解析成功'
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('SnapAny error:', error.message);
+        }
+
+        // 尝试 savefrom API
         try {
             console.log('Trying savefrom API...');
             const savefromUrl = `https://savefrom.do/api/v1/info?url=${encodeURIComponent(url)}`;
@@ -131,46 +176,6 @@ async function handleParse(request) {
             }
         } catch (error) {
             console.error('ssyoutube error:', error.message);
-        }
-
-        // 尝试 y2mate API
-        try {
-            console.log('Trying y2mate API...');
-            const y2mateUrl = `https://y2mate.com/api/v1/info?url=${encodeURIComponent(url)}`;
-            const response = await fetch(y2mateUrl, {
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            console.log('y2mate response status:', response.status);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('y2mate response:', JSON.stringify(data).substring(0, 500));
-                
-                if (data.url || (data.data && data.data.url)) {
-                    const videoUrl = data.url || data.data.url;
-                    console.log('Found video URL from y2mate:', videoUrl);
-                    return jsonResponse({
-                        success: true,
-                        data: {
-                            url: url,
-                            platform: platformInfo.name,
-                            contentType: platformInfo.contentType,
-                            title: data.title || data.data?.title || `${platformInfo.name}视频`,
-                            thumbnail: data.thumbnail || data.data?.thumbnail || '',
-                            downloadUrl: videoUrl,
-                            duration: 0,
-                            fileSize: 0,
-                            message: '解析成功'
-                        }
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('y2mate error:', error.message);
         }
 
         return jsonResponse({ success: false, message: '所有解析接口都失败了，请稍后再试' }, 500);
