@@ -1,5 +1,5 @@
 // Cloudflare Worker - 视频解析服务
-// 简化版本 - 返回第三方解析网站链接
+// 使用 layzz.cn API
 
 const SUPPORTED_PLATFORMS = {
     douyin: { name: '抖音', domains: ['douyin.com', 'iesdouyin.com'], contentType: 'video' },
@@ -12,14 +12,6 @@ const SUPPORTED_PLATFORMS = {
     instagram: { name: 'Instagram', domains: ['instagram.com'], contentType: 'video' },
     facebook: { name: 'Facebook', domains: ['facebook.com', 'fb.watch'], contentType: 'video' }
 };
-
-// 第三方解析网站列表
-const PARSER_SITES = [
-    { name: 'SnapAny', url: 'https://snapany.com' },
-    { name: 'SaveFrom', url: 'https://savefrom.net' },
-    { name: 'Y2mate', url: 'https://y2mate.com' },
-    { name: 'SSYouTube', url: 'https://ssyoutube.com' }
-];
 
 export default {
     async fetch(request, env, ctx) {
@@ -61,37 +53,62 @@ async function handleParse(request) {
 
         console.log('Platform identified:', platformInfo.name);
 
-        // 方案1: 尝试 yt-dlp 风格的 API (如果用户有自己的服务)
-        // 这里可以配置用户自己的解析服务
-        
-        // 方案2: 返回第三方解析网站的嵌入链接
-        // 生成 SnapAny 的解析链接
-        const snapanyParseUrl = `https://snapany.com/#${encodeURIComponent(url)}`;
-        
-        // 或者使用 iframe 嵌入方案
-        // 返回解析结果，前端可以用 iframe 打开
-        
-        return jsonResponse({
-            success: true,
-            data: {
-                url: url,
-                platform: platformInfo.name,
-                contentType: platformInfo.contentType,
-                title: `${platformInfo.name}视频`,
-                thumbnail: '',
-                downloadUrl: snapanyParseUrl,  // 返回第三方解析页面
-                embedUrl: snapanyParseUrl,      // 可以嵌入的 URL
-                parserSites: PARSER_SITES.map(site => ({
-                    name: site.name,
-                    url: `${site.url}/#${encodeURIComponent(url)}`
-                })),
-                duration: 0,
-                fileSize: 0,
-                message: '请使用下方链接下载',
-                type: 'third_party'  // 标记为第三方解析
+        // 使用 layzz.cn API
+        try {
+            console.log('Trying layzz.cn API...');
+            
+            // 使用测试 token，生产环境应该使用自己的 token
+            const token = 'uuic-qackd-fga-test';
+            const apiUrl = `https://analyse.layzz.cn/lyz/getAnalyse?token=${token}&link=${encodeURIComponent(url)}`;
+            
+            console.log('API URL:', apiUrl);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json'
+                }
+            });
+
+            console.log('layzz.cn response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('layzz.cn response:', JSON.stringify(data).substring(0, 1000));
+                
+                // 根据 layzz.cn 的响应格式解析
+                // 假设返回格式为: { code: 200, data: { videoUrl: 'xxx', title: 'xxx' }, msg: 'success' }
+                if (data.code === 200 || data.success === true) {
+                    const videoData = data.data || data;
+                    const videoUrl = videoData.videoUrl || videoData.url || videoData.playUrl || videoData.downloadUrl;
+                    const title = videoData.title || videoData.desc || `${platformInfo.name}视频`;
+                    const thumbnail = videoData.cover || videoData.thumbnail || videoData.pic || '';
+                    
+                    if (videoUrl) {
+                        console.log('Found video URL from layzz.cn:', videoUrl);
+                        return jsonResponse({
+                            success: true,
+                            data: {
+                                url: url,
+                                platform: platformInfo.name,
+                                contentType: platformInfo.contentType,
+                                title: title,
+                                thumbnail: thumbnail,
+                                downloadUrl: videoUrl,
+                                duration: videoData.duration || 0,
+                                fileSize: videoData.size || 0,
+                                message: '解析成功'
+                            }
+                        });
+                    }
+                }
             }
-        });
-        
+        } catch (error) {
+            console.error('layzz.cn error:', error.message);
+        }
+
+        return jsonResponse({ success: false, message: '解析失败，请稍后再试' }, 500);
     } catch (error) {
         console.error('Parse error:', error.message);
         return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500);
