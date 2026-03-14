@@ -1,7 +1,7 @@
-// API 配置 - 使用 Cloudflare Worker 后端
+// API 配置 - 使用 Render.com 后端
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8788/api'
-    : 'https://jxhoutai.farholme.com/api';
+    ? 'http://localhost:5000'
+    : 'https://ai-video-downloader.onrender.com';
 
 // 支持的平台
 const SUPPORTED_PLATFORMS = {
