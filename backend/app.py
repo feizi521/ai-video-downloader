@@ -189,6 +189,29 @@ def parse_video():
 def health_check():
     return jsonify({'status': 'ok', 'message': 'yt-dlp service is running'})
 
+@app.route('/test', methods=['GET'])
+def test_ytdlp():
+    try:
+        # 测试 yt-dlp 是否可用
+        result = subprocess.run(['yt-dlp', '--version'], capture_output=True, text=True, timeout=10)
+        version = result.stdout.strip()
+        
+        # 测试 YouTube 解析（不下载）
+        test_result = subprocess.run([
+            'yt-dlp', '--dump-json', '--no-download', 
+            '--playlist-items', '0',
+            'https://youtu.be/f_rB7cEtsDA'
+        ], capture_output=True, text=True, timeout=30)
+        
+        return jsonify({
+            'yt_dlp_version': version,
+            'test_returncode': test_result.returncode,
+            'test_stderr': test_result.stderr[:500] if test_result.stderr else None,
+            'test_stdout_length': len(test_result.stdout)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     from waitress import serve
     port = int(os.environ.get('PORT', 5000))
