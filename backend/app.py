@@ -185,6 +185,18 @@ def parse_video():
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'}), 500
 
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        'status': 'ok',
+        'message': 'Video Parser API is running',
+        'endpoints': {
+            'health': '/health',
+            'parse': '/parse (POST)',
+            'test': '/test'
+        }
+    })
+
 @app.route('/health', methods=['GET', 'HEAD'])
 def health_check():
     return jsonify({'status': 'ok', 'message': 'yt-dlp service is running'})
