@@ -100,7 +100,7 @@ def extract_best_url(info):
     
     return None
 
-@app.route('/api/parse', methods=['POST'])
+@app.route('/parse', methods=['POST'])
 def parse_video():
     try:
         data = request.get_json()
@@ -149,7 +149,7 @@ def parse_video():
         print(f"Parse error: {e}")
         return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'}), 500
 
-@app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET', 'HEAD'])
 def health_check():
     return jsonify({'status': 'ok', 'message': 'yt-dlp service is running'})
 
