@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, make_response
 import subprocess
 import json
 import os
+import sys
 from urllib.parse import urlparse
 
 app = Flask(__name__)
@@ -55,6 +56,16 @@ def identify_platform(url):
 
 def get_video_info(url):
     try:
+        print(f"Starting yt-dlp for URL: {url}", flush=True)
+        
+        # 检查 yt-dlp 是否存在
+        try:
+            version_result = subprocess.run(['yt-dlp', '--version'], capture_output=True, text=True, timeout=10)
+            print(f"yt-dlp version: {version_result.stdout.strip()}", flush=True)
+        except Exception as e:
+            print(f"yt-dlp not found: {e}", flush=True)
+            return None
+        
         cmd = [
             'yt-dlp',
             '--dump-json',
@@ -65,24 +76,38 @@ def get_video_info(url):
             url
         ]
         
+        print(f"Running command: {' '.join(cmd)}", flush=True)
+        
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         
-        if result.returncode == 0 and result.stdout:
-            return json.loads(result.stdout)
+        print(f"Return code: {result.returncode}", flush=True)
+        print(f"Stdout length: {len(result.stdout)}", flush=True)
+        print(f"Stderr: {result.stderr[:500] if result.stderr else 'None'}", flush=True)
         
-        print(f"yt-dlp error: {result.stderr}")
+        if result.returncode == 0 and result.stdout:
+            try:
+                data = json.loads(result.stdout)
+                print(f"Successfully parsed JSON", flush=True)
+                return data
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}", flush=True)
+                return None
+        
+        print(f"yt-dlp failed: {result.stderr}", flush=True)
         return None
     except subprocess.TimeoutExpired:
-        print("yt-dlp timeout")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"JSON decode error: {e}")
+        print("yt-dlp timeout", flush=True)
         return None
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Exception in get_video_info: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return None
 
 def extract_best_url(info):
+    if not info:
+        return None
+        
     if 'url' in info:
         return info['url']
     
@@ -103,7 +128,14 @@ def extract_best_url(info):
 @app.route('/parse', methods=['POST'])
 def parse_video():
     try:
+        print("="*50, flush=True)
+        print("Received parse request", flush=True)
+        
         data = request.get_json()
+        if not data:
+            print("No JSON data received", flush=True)
+            return jsonify({'success': False, 'message': '请提供JSON数据'}), 400
+            
         url = data.get('url', '').strip()
         
         if not url:
@@ -113,7 +145,7 @@ def parse_video():
         if not platform:
             return jsonify({'success': False, 'message': '不支持的平台'}), 400
         
-        print(f"Parsing {platform} URL: {url}")
+        print(f"Parsing {platform} URL: {url}", flush=True)
         
         info = get_video_info(url)
         
@@ -131,6 +163,8 @@ def parse_video():
             thumbnail = info['thumbnails'][0].get('url', '')
         duration = info.get('duration', 0)
         
+        print(f"Success! Title: {title[:50]}...", flush=True)
+        
         return jsonify({
             'success': True,
             'data': {
@@ -146,7 +180,9 @@ def parse_video():
             }
         })
     except Exception as e:
-        print(f"Parse error: {e}")
+        print(f"Parse error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'}), 500
 
 @app.route('/health', methods=['GET', 'HEAD'])
@@ -155,4 +191,6 @@ def health_check():
 
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Starting server on port {port}", flush=True)
+    serve(app, host='0.0.0.0', port=port)
